@@ -138,12 +138,13 @@ Details stehen in [`docs/runtime-tests.md`](docs/runtime-tests.md).
 
 Der Resetpfad und Deskriptorlayouts wurden aus dem vom Nutzer genannten
 [`chris1111/BCM5722D`](https://github.com/chris1111/BCM5722D) nach C portiert
-und mit simulierten Registern getestet. Der Reset wird vom Diagnosebuild noch
-nicht aufgerufen. Herkunft und Lizenz: [`docs/hardware-port.md`](docs/hardware-port.md),
+und mit simulierten Registern getestet. Der Diagnosebuild führt den Reset nur mit
+`[BCM57DBG] ResetTest=1` in der SYSTEM.INI aus; ohne den Schalter bleibt er
+rein lesend. Herkunft und Lizenz: [`docs/hardware-port.md`](docs/hardware-port.md),
 GPL-2.0-or-later für die adaptierten Hardwareteile, Lizenztext in `COPYING`.
 
-Als Nächstes folgen Hardwaretests der PCI-/MMIO-Diagnose, Anschluss der
-WfW-Plattformdienste an den Resetpfad sowie PHY, DMA-Ringe und Paketbetrieb.
+Als Nächstes folgen Hardwaretests der PCI-/MMIO-Diagnose und des Resets
+sowie PHY, DMA-Ringe und Paketbetrieb.
 Die geplante Proxmox-VM mit durchgereichtem BCM5722 ist noch nicht verfügbar.
 
 Die maßgebliche Hardwarebeschreibung ist

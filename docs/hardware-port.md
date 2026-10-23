@@ -25,11 +25,19 @@ Testkopie stammt aus JHRobotics/patcher9x; dessen MIT-Lizenz steht separat in
 - Auswertung der PCI-BARs im Diagnosepfad; keine Kürzung von Adressen über 4 GiB.
 - Lesender MMIO-Probelauf mit Abgleich der ASIC-Kennung zwischen PCI und MMIO.
 
-Die C-Resetfunktion wird mitgebaut, aber vom Diagnose-VxD **nicht aufgerufen**.
-Die konkreten Schreib- und Zeitdienste der WfW-Plattform sind ihr noch nicht
-angeschlossen. Voraussetzung für den späteren Aufruf sind ein exklusiv
-übernommener, ruhender Adapter, gültiges MMIO und eingeschaltete PCI-Memory-/
-Busmaster-Bits. Der aktuelle Diagnosepfad aktiviert diese Bits nicht selbst.
+`src/platform.c` schließt die Resetfunktion an die WfW-Plattform an: MMIO über
+die `_MapPhysToLinear`-Abbildung, PCI-Konfiguration über Mechanismus 1 mit
+echten 16-Bit-Zugriffen (kein Lesen-Ändern-Schreiben des Dwords, das RW1C-
+Statusbits nebenan löschen würde) und Wartezeiten über den PIT-Kanal 0. Dessen
+Reloadwert gehört Windows; bei einem Überlauf zählen nur die sicher vergangenen
+Takte, eine Wartezeit wird dadurch nie kürzer als verlangt.
+
+Der Diagnose-VxD ruft den Reset **nur** mit `ResetTest=1` im Abschnitt
+`[BCM57DBG]` der SYSTEM.INI auf. Dann setzt er bei Bedarf die PCI-Memory-/
+Busmaster-Bits, führt einen Reset aus und protokolliert Ergebnis,
+Host-Control und MAC-Register. Die MAC-Engines bleiben aus, DMA wird nicht
+programmiert. Voraussetzung bleibt ein Adapter, den kein anderer Treiber
+(z. B. `B57.dos`) benutzt. Ohne den Schalter bleibt der Diagnosepfad rein lesend.
 
 ## Änderungen gegenüber der Vorlage
 
@@ -49,7 +57,10 @@ für die Abarbeitung gepufferter Schreibzugriffe.
 PCI-Voraussetzungen, NVRAM-Timeout, Firmware-Timeout und Deskriptor-Layouts.
 Das belegt die Softwareverträge, nicht die elektrische Funktion auf einer Karte.
 
-Noch zu portieren bzw. anzuschließen: WfW-Schreibzugriffe und Zeitdienste,
-PHY-/MDIO-Initialisierung, DMA-Allokation und -Adressübersetzung,
+`tests/test_platform.c` prüft Config-Adressen und Zugriffsbreiten sowie die
+Wartezeit gegen einen simulierten PIT mit verschiedenen Reloadwerten und
+Abfrageabständen.
+
+Noch zu portieren bzw. anzuschließen: PHY-/MDIO-Initialisierung, DMA-Allokation und -Adressübersetzung,
 RX-/TX-Ringbetrieb, IRQ-Quittierung und die vollständigen NDIS-Paketpfade.
 Die geplante Proxmox-VM mit BCM5722-Passthrough steht noch nicht zur Verfügung.

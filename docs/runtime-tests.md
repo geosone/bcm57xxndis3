@@ -76,9 +76,16 @@ Zugriffen in der vorhandenen WfW-NDIS-Implementierung abgeglichen und durch den
 real erreichten `AddAdapter`-Callback bestätigt. Die Watcom-Größenprüfung und
 Host-Offsettests verhindern ein Zurückfallen auf das falsche 56-Byte-Layout.
 
+## SYSTEM.INI-Schalter
+
+Der Smoke-Test trägt `[BCM57DBG] ResetTest=1` ein und erwartet
+`BCM57DBG: ResetTest=00000001` im Protokoll. Das belegt den VMM-Dienst
+`Get_Profile_Decimal_Int`. Ohne BCM5722 erreicht der Lauf den Resetpfad nicht.
+
 ## Ausstehend
 
 Auf dem Entwicklungsrechner fehlt die echte BCM5722-Karte. Der lesende MMIO-
 Probelauf, Reset/PHY, DMA, Hardwareinterrupts und Paketübertragung sind noch
-nicht auf realer Hardware geprüft. Der Resetcode ist bislang nur im Mocktest
-aktiv; der Diagnosebuild schreibt keine NIC-Register.
+nicht auf realer Hardware geprüft. Der Resetcode ist an die WfW-Plattform
+angeschlossen, lief aber bisher nur gegen simulierte Register; ohne
+`ResetTest=1` schreibt der Diagnosebuild keine NIC-Register.

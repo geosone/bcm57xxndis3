@@ -1,12 +1,15 @@
-/* Ring-0 preflight and MAC callback probe. No NIC register writes or DMA. */
+/* Ring-0 preflight and MAC callback probe. No NIC register writes or DMA,
+ * unless [BCM57DBG] ResetTest=1 in SYSTEM.INI asks for one reset. */
 #include "pci.h"
 #include "ndis3.h"
+#include "platform.h"
 
 extern uint32_t bcm_ndis_version(void);
 extern uint32_t bcm_vmm_version(void);
 extern uint32_t bcm_config_read(uint32_t address);
 extern void bcm_debug_char(unsigned character);
 extern void *bcm_map_mmio(uint32_t physical);
+extern int bcm_profile_int(const char *key, int def);
 
 void bcm_log_text(const char *text)
 {
@@ -31,6 +34,46 @@ static uint32_t read_config(void *context, unsigned bus, unsigned device,
                            ((uint32_t)function << 8) | (offset & 0xfc));
 }
 
+static const char *const reset_results[] = {
+    "ok", "wrong device", "PCI memory/bus master disabled",
+    "NVRAM arbitration timeout", "bootcode timeout"
+};
+
+/* Opt-in: one chip reset with bus mastering enabled; MAC engines stay off. */
+static void reset_test(const struct bcm_pci_device *card,
+                       volatile uint32_t *mmio)
+{
+    struct bcm_platform platform;
+    struct bcm_hw_io io;
+    enum bcm_hw_result result;
+    uint16_t command;
+
+    platform.bus = card->bus;
+    platform.device = card->device;
+    platform.function = card->function;
+    platform.mmio = mmio;
+    bcm_platform_io(&platform, &io);
+    command = io.pci_read16(io.context, 4);
+    if ((command & 6) != 6) {
+        io.pci_write16(io.context, 4, (uint16_t)(command | 6));
+        bcm_log_text("BCM57DBG: ResetTest: PCI command ");
+        bcm_log_hex(command);
+        bcm_log_text(" -> ");
+        bcm_log_hex(io.pci_read16(io.context, 4));
+        bcm_log_text("\r\n");
+    }
+    result = bcm5722_reset(&io);
+    bcm_log_text("BCM57DBG: ResetTest: ");
+    bcm_log_text(result <= BCM_HW_FIRMWARE_TIMEOUT ? reset_results[result] : "?");
+    bcm_log_text(" host-control=");
+    bcm_log_hex(mmio[0x68 / 4]);
+    bcm_log_text(" MAC-high=");
+    bcm_log_hex(mmio[0x410 / 4]);
+    bcm_log_text(" MAC-low=");
+    bcm_log_hex(mmio[0x414 / 4]);
+    bcm_log_text("\r\n");
+}
+
 void bcm_probe_init(void)
 {
     struct bcm_pci_device card;
@@ -38,6 +81,7 @@ void bcm_probe_init(void)
     bcm_ndis_status status;
     uint32_t physical, pci_host, mmio_host;
     volatile uint32_t *mmio;
+    int reset;
 
     bcm_log_text("BCM57DBG: diagnostic init; no network support\r\n");
     bcm_log_text("BCM57DBG: VMM version raw=");
@@ -53,6 +97,10 @@ void bcm_probe_init(void)
         bcm_log_hex(status);
         bcm_log_text("\r\n");
     }
+    reset = bcm_profile_int("ResetTest", 0);
+    bcm_log_text("BCM57DBG: ResetTest=");
+    bcm_log_hex((uint32_t)reset);
+    bcm_log_text("\r\n");
     if (!bcm_find_5722(read_config, 0, &card)) {
         bcm_log_text("BCM57DBG: BCM5722 14e4:165a not found\r\n");
         return;
@@ -106,5 +154,10 @@ void bcm_probe_init(void)
     bcm_log_hex(mmio[0x414 / 4]);
     bcm_log_text(" mode=");
     bcm_log_hex(mmio[0x6800 / 4]);
-    bcm_log_text("\r\nBCM57DBG: probe complete; NIC configuration unchanged\r\n");
+    bcm_log_text("\r\n");
+    if (!reset) {
+        bcm_log_text("BCM57DBG: probe complete; NIC configuration unchanged\r\n");
+        return;
+    }
+    reset_test(&card, mmio);
 }

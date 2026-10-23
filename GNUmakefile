@@ -18,13 +18,13 @@ $(OUT):
 $(OUT)/entry.obj: src/entry.asm | $(OUT)
 	$(ASM) -q -Fo$@ $<
 
-$(OUT)/%.obj: src/%.c src/pci.h src/ndis3.h | $(OUT)
+$(OUT)/%.obj: src/%.c src/pci.h src/ndis3.h src/platform.h src/bcm5722_hw.h | $(OUT)
 	$(CC386) $(CFLAGS386) -fo=$@ $<
 
 $(OUT)/bcm5722_hw.obj: src/bcm5722_hw.h
 
-$(OUT)/BCM57DBG.386: $(OUT)/entry.obj $(OUT)/probe.obj $(OUT)/pci.obj $(OUT)/ndis3.obj $(OUT)/bcm5722_hw.obj tools/check_vxd.py
-	$(LINK386) format windows vxd name $@ option quiet option map=$(OUT)/BCM57DBG.map file $(OUT)/entry.obj file $(OUT)/probe.obj file $(OUT)/pci.obj file $(OUT)/ndis3.obj file $(OUT)/bcm5722_hw.obj segment _TEXT PRELOAD NONDISCARDABLE segment _DATA PRELOAD NONDISCARDABLE export BCM57DBG_DDB.1=_BCM57DBG_DDB
+$(OUT)/BCM57DBG.386: $(OUT)/entry.obj $(OUT)/probe.obj $(OUT)/pci.obj $(OUT)/ndis3.obj $(OUT)/bcm5722_hw.obj $(OUT)/platform.obj tools/check_vxd.py
+	$(LINK386) format windows vxd name $@ option quiet option map=$(OUT)/BCM57DBG.map file $(OUT)/entry.obj file $(OUT)/probe.obj file $(OUT)/pci.obj file $(OUT)/ndis3.obj file $(OUT)/bcm5722_hw.obj file $(OUT)/platform.obj segment _TEXT PRELOAD NONDISCARDABLE segment _DATA PRELOAD NONDISCARDABLE export BCM57DBG_DDB.1=_BCM57DBG_DDB
 	$(PYTHON) tools/check_vxd.py --prepare $@
 
 $(OUT)/test_pci: tests/test_pci.c src/pci.c src/pci.h | $(OUT)
@@ -36,10 +36,14 @@ $(OUT)/test_ndis3: tests/test_ndis3.c src/ndis3.c src/ndis3.h | $(OUT)
 $(OUT)/test_hw: tests/test_hw.c src/bcm5722_hw.c src/bcm5722_hw.h | $(OUT)
 	$(HOST_CC) -std=c99 -Wall -Wextra -Werror -pedantic -Isrc tests/test_hw.c src/bcm5722_hw.c -o $@
 
-check: all $(OUT)/test_pci $(OUT)/test_ndis3 $(OUT)/test_hw
+$(OUT)/test_platform: tests/test_platform.c src/platform.c src/platform.h src/bcm5722_hw.h | $(OUT)
+	$(HOST_CC) -std=c99 -Wall -Wextra -Werror -pedantic -Isrc tests/test_platform.c src/platform.c -o $@
+
+check: all $(OUT)/test_pci $(OUT)/test_ndis3 $(OUT)/test_hw $(OUT)/test_platform
 	$(OUT)/test_pci
 	$(OUT)/test_ndis3
 	$(OUT)/test_hw
+	$(OUT)/test_platform
 	$(PYTHON) tools/check_vxd.py $(OUT)/BCM57DBG.386
 
 $(OUT)/WFWEXIT.EXE: tests/wfw_exit.c | $(OUT)

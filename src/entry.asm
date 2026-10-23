@@ -173,6 +173,122 @@ bcm_config_read proc address:dword
     ret
 bcm_config_read endp
 
+; 16-bit read at 0CFCh + (address & 2); the latch gets the dword address.
+bcm_config_read16 proc address:dword
+    pushfd
+    cli
+    push edx
+    push ecx
+    mov dx, 0cf8h
+    in eax, dx
+    mov ecx, eax
+    mov eax, address
+    and al, 0fch
+    out dx, eax
+    mov edx, address
+    and edx, 2
+    add dx, 0cfch
+    in ax, dx
+    movzx eax, ax
+    push eax
+    mov eax, ecx
+    mov dx, 0cf8h
+    out dx, eax
+    pop eax
+    pop ecx
+    pop edx
+    popfd
+    ret
+bcm_config_read16 endp
+
+; A word write leaves the neighbouring word (often RW1C status) untouched.
+bcm_config_write16 proc address:dword, value:dword
+    pushfd
+    cli
+    push edx
+    push ecx
+    mov dx, 0cf8h
+    in eax, dx
+    mov ecx, eax
+    mov eax, address
+    and al, 0fch
+    out dx, eax
+    mov edx, address
+    and edx, 2
+    add dx, 0cfch
+    mov eax, value
+    out dx, ax
+    mov eax, ecx
+    mov dx, 0cf8h
+    out dx, eax
+    pop ecx
+    pop edx
+    popfd
+    ret
+bcm_config_write16 endp
+
+bcm_config_write32 proc address:dword, value:dword
+    pushfd
+    cli
+    push edx
+    push ecx
+    mov dx, 0cf8h
+    in eax, dx
+    mov ecx, eax
+    mov eax, address
+    and al, 0fch
+    out dx, eax
+    mov dx, 0cfch
+    mov eax, value
+    out dx, eax
+    mov eax, ecx
+    mov dx, 0cf8h
+    out dx, eax
+    pop ecx
+    pop edx
+    popfd
+    ret
+bcm_config_write32 endp
+
+; Latched PIT channel 0 count; the latch and both reads must not be split.
+bcm_pit_count proc
+    pushfd
+    cli
+    xor eax, eax
+    out 43h, al                 ; counter 0, latch
+    in al, 40h
+    mov ah, al
+    in al, 40h
+    xchg al, ah
+    popfd
+    ret
+bcm_pit_count endp
+
+; int bcm_profile_int(const char *key, int default): [BCM57DBG] in SYSTEM.INI
+bcm_profile_int proc key:dword, def:dword
+    push ebx
+    push ecx
+    push edx
+    push esi
+    push edi
+    push ebp
+    mov eax, def
+    mov esi, offset profile_section
+    mov edi, key
+    int 20h
+    dd 000100abh                ; Get_Profile_Decimal_Int
+    pop ebp
+    pop edi
+    pop esi
+    pop edx
+    pop ecx
+    pop ebx
+    cld
+    ret
+bcm_profile_int endp
+
+profile_section db "BCM57DBG", 0
+
 ; Emulator debug console only; no UART or DOS services are touched.
 bcm_debug_char proc character:dword
     push edx

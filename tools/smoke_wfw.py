@@ -85,6 +85,8 @@ def main():
                     "LANABASE=0\n")
         (work / "PROTOCOL.INI").write_bytes(protocol.replace("\n", "\r\n").encode())
         mcopy(work / "PROTOCOL.INI", "::/WINDOWS/PROTOCOL.INI")
+    # Exercises Get_Profile_Decimal_Int; without a BCM5722 nothing is reset.
+    text = set_values(text, "BCM57DBG", {"ResetTest": "1"})
     lines = text.splitlines()
     index = next(i for i, line in enumerate(lines)
                  if line.strip().lower() == "[386enh]")
@@ -146,7 +148,8 @@ def main():
     marker = subprocess.run(["mtype", "-i", fat, "::/BCMDONE.TXT"],
                             capture_output=True)
     if (result.returncode != 1 or marker.returncode != 0 or
-            "BCM57DBG: BCM5722 14e4:165a not found" not in log):
+            "BCM57DBG: BCM5722 14e4:165a not found" not in log or
+            "BCM57DBG: ResetTest=00000001" not in log):
         parser.exit(1, f"WfW smoke test failed; inspect {work}\n")
     if (args.ndis or args.network_dir) and "raw=00000000" in log:
         parser.exit(1, "NDIS version query failed\n")
