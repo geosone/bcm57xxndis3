@@ -124,6 +124,29 @@ Treiberlogik. Die untersuchten Beispiele liefern jedoch keinen direkten
 WfW-3.11-Build oder Ersatz für dessen Aufrufkonventionen und VxD-Startcode.
 Es wurde kein NT-Treiber ausgeführt, installiert oder übersetzt.
 
+## Windows-NT-3.1-DDK (Oktober 1994)
+
+Archiv `~/Iso/Windows 3x/Microsoft Windows NT 3.1 Win32 SDK and DDK (Oct 1994)
+(MSDN) (ISO).7z`, SHA-256 `033c6aaa6f187c2ceb45f3d2db3357fca2b5a33bc52b821be285c7397f398b44`; ISO
+und Netzwerkquellen entpackt nach `/tmp/bcm57xx-ddk-review/nt31/`.
+
+Anders als das NT-3.51-DDK enthält es **NDIS-3.0-Full-MAC-Treiber** derselben
+Generation wie WfW 3.11:
+
+- `DDK/SRC/NETWORK/LANCE/`: Busmaster-Ethernet mit Deskriptorringen,
+  `NdisRegisterMac`, `LANCE_NDIS_MAJOR_VERSION 3`, `MINOR 0`; `LOOPBACK.C`
+  zeigt die von NDIS 3.0 verlangte Rückgabe eigener Frames an Protokolle,
+  `TRANSFER.C` das TransferData-Modell zu `NdisIndicateReceive`.
+- `DDK/SRC/NETWORK/SONIC/`: weiterer Busmaster-Ethernet-MAC, ebenfalls 3.0.
+- `DDK/SRC/NETWORK/INC/NDIS.H`: `NDIS_MAC_CHARACTERISTICS` mit genau den
+  Feldern unserer 54-Byte-Tabelle; `EFILTER.H` die Ethernet-Filterbibliothek.
+- `DDK/HLP/NETWORKS.HLP`: Referenz der NDIS-3.0-Schnittstelle.
+
+Das ist die passende Vorlage für Sende-/Empfangspfad, Anfragen und Filter.
+Die NT-Aufrufkonventionen (stdcall, NT-Typen) gelten für WfW nicht; die
+Dienste werden weiter über unsere cdecl-Thunks angesprochen. Kein Quellcode
+wurde in dieses Repository kopiert.
+
 ## Nächster Umsetzungsschritt
 
 Die WfW-3.11-Aufrufkonventionen, Strukturen und Dienstnummern anhand zeitgerechter

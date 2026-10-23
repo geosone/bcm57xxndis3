@@ -40,9 +40,30 @@ struct bcm_hw_io {
 
 enum bcm_hw_result {
     BCM_HW_OK, BCM_HW_WRONG_DEVICE, BCM_HW_PCI_DISABLED,
-    BCM_HW_NVRAM_TIMEOUT, BCM_HW_FIRMWARE_TIMEOUT
+    BCM_HW_NVRAM_TIMEOUT, BCM_HW_FIRMWARE_TIMEOUT, BCM_HW_BUFFER_MANAGER_TIMEOUT
 };
 
 enum bcm_hw_result bcm5722_reset(const struct bcm_hw_io *);
+
+/* Physical addresses of the rings (below 4 GiB) and the number of standard
+ * ring slots already posted. */
+struct bcm_ring_addresses {
+    uint32_t tx, std, ret, status;
+    unsigned std_posted;
+};
+
+/* After bcm5722_reset: programs DMA, buffer manager, rings, coalescing and
+ * the MAC address, then enables all engines. mac_mode/rx_mode/tx_mode are
+ * the caller's register shadows (struct bcm_mac_modes in bcm5722_phy.h). */
+enum bcm_hw_result bcm5722_start(const struct bcm_hw_io *,
+    const struct bcm_ring_addresses *, const uint8_t mac[6],
+    uint32_t mac_mode, uint32_t rx_mode, uint32_t tx_mode);
+
+/* Disables receive, transmit and DMA engines in the documented order;
+ * returns the number of engines whose enable bit did not clear. */
+unsigned bcm5722_stop(const struct bcm_hw_io *);
+
+/* Station address the bootcode loaded into MAC address register 0. */
+void bcm5722_read_mac(const struct bcm_hw_io *, uint8_t mac[6]);
 
 #endif

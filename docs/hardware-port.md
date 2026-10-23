@@ -73,10 +73,35 @@ Mit `ResetTest=1` folgen auf einen erfolgreichen Chipreset PHY-ID, PHY-Reset,
 Autonegotiation und bis zu 5 s Linkabfrage; das Protokoll nennt Geschwindigkeit,
 Duplex und Flusssteuerung. Die MAC-Engines bleiben dabei aus.
 
+DMA (Schritt 3): `src/platform.c` beschafft feste Seiten über `_PageAllocate`
+und ermittelt physische Adressen über `_CopyPageTable`. Nur der Ringblock
+(44 KiB: Senden, Standard-Empfang, Rückgabe, Statusblock) muss zusammenhängend
+sein; nicht zusammenhängende Versuche werden bis zu achtmal wiederholt und
+danach freigegeben. Die Paketpuffer liegen zu zweit in einer Seite.
+`src/bcm5722_ring.c` hält 64 Empfangs- und 32 Sendepuffer; die 512er-Ringe
+des Chips verweisen zyklisch darauf (Slot s nutzt Puffer s mod n), sodass der
+Standardring nie umgeschrieben werden muss. Gesendet wird per Kopie in einen
+Sendepuffer, aufgefüllt auf 60 Byte. `bcm5722_start()` und `bcm5722_stop()`
+in `src/bcm5722_hw.c` portieren `initializeAdapter`, `stopAdapter` und
+`configureMACAddress`; korrigiert ist der Backoff-Startwert, in den die Vorlage
+`mac[4]` doppelt und `mac[5]` gar nicht einrechnete.
+
+`ResetTest=2` führt nach PHY-Setup einen DMA-Test im internen MAC-Loopback aus:
+8 Frames an die eigene Adresse müssen unverändert zurückkommen. Das benötigt
+weder Kabel noch Gegenstelle.
+
+`tests/test_ring.c` lässt 2000 Frames durch einen simulierten Chip laufen
+(alle Ringindizes laufen mehrfach über) und prüft Sendegrenzen,
+Empfangsfreigabe und Fehlerfälle; `tests/test_start.c` prüft Ringadressen,
+Statusblock, MAC-Adresse, die Reihenfolge der Engine-Freigaben sowie
+Stoppsequenz und Timeouts.
+
 `tests/test_platform.c` prüft Config-Adressen und Zugriffsbreiten sowie die
 Wartezeit gegen einen simulierten PIT mit verschiedenen Reloadwerten und
 Abfrageabständen.
 
-Noch zu portieren bzw. anzuschließen: DMA-Allokation und -Adressübersetzung,
-RX-/TX-Ringbetrieb, IRQ-Quittierung und die vollständigen NDIS-Paketpfade.
+Noch anzuschließen: Hardwareinterrupt über VPICD mit Statusblock-Tag und
+IRQ-Quittierung sowie die NDIS-Pfade (Open/Close, Send, Empfangsanzeige mit
+TransferData, Anfragen, Paketfilter, Loopback) nach dem Vorbild von LANCE aus
+dem NT-3.1-DDK.
 Die geplante Proxmox-VM mit BCM5722-Passthrough steht noch nicht zur Verfügung.

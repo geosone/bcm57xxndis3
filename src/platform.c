@@ -1,4 +1,5 @@
 #include "platform.h"
+#include "bcm5722_ring.h"
 
 /* PIT input 1.19318 MHz; in mode 3 the counter steps by 2, 2.386 counts/us.
  * In mode 2 the same count takes twice as long, which only lengthens delays. */
@@ -76,4 +77,71 @@ void bcm_platform_io(struct bcm_platform *platform, struct bcm_hw_io *io)
     io->pci_write16 = pci_write16;
     io->pci_write32 = pci_write32;
     io->delay_us = delay_us;
+}
+
+#define RING_PAGES (BCM_RING_BLOCK_SIZE / 4096)
+#define BUFFER_PAGES ((BCM_RX_BUFFERS + BCM_TX_BUFFERS) / 2)
+
+static uint32_t ring_handle, buffer_handle;
+
+static int contiguous(const uint8_t *linear, unsigned pages)
+{
+    uint32_t physical = bcm_lin_to_phys(linear);
+    unsigned i;
+    for (i = 1; i < pages; ++i)
+        if (bcm_lin_to_phys(linear + i * 4096UL) != physical + i * 4096UL)
+            return 0;
+    return 1;
+}
+
+int bcm_platform_dma_alloc(struct bcm_rings *r)
+{
+    uint32_t failed[8];
+    unsigned tries, i;
+    uint8_t *block = 0, *buffers;
+
+    /* A non-contiguous block stays allocated until the next try is done, so
+     * that the next allocation cannot return the same pages. */
+    for (tries = 0; tries < 8; ++tries) {
+        block = bcm_page_alloc(RING_PAGES, &ring_handle);
+        if (!block)
+            break;
+        if (contiguous(block, RING_PAGES))
+            break;
+        failed[tries] = ring_handle;
+        block = 0;
+    }
+    for (i = 0; i < tries; ++i)
+        bcm_page_free(failed[i]);
+    if (!block) {
+        ring_handle = 0;
+        return -1;
+    }
+    buffers = bcm_page_alloc(BUFFER_PAGES, &buffer_handle);
+    if (!buffers) {
+        bcm_page_free(ring_handle);
+        ring_handle = buffer_handle = 0;
+        return -1;
+    }
+    bcm_rings_setup(r, block, bcm_lin_to_phys(block));
+    for (i = 0; i < BCM_RX_BUFFERS + BCM_TX_BUFFERS; ++i) {
+        uint8_t *buffer = buffers + i * 2048UL;
+        if (i < BCM_RX_BUFFERS) {
+            r->rx_buffer[i] = buffer;
+            r->rx_phys[i] = bcm_lin_to_phys(buffer);
+        } else {
+            r->tx_buffer[i - BCM_RX_BUFFERS] = buffer;
+            r->tx_phys[i - BCM_RX_BUFFERS] = bcm_lin_to_phys(buffer);
+        }
+    }
+    return 0;
+}
+
+void bcm_platform_dma_free(void)
+{
+    if (buffer_handle)
+        bcm_page_free(buffer_handle);
+    if (ring_handle)
+        bcm_page_free(ring_handle);
+    buffer_handle = ring_handle = 0;
 }

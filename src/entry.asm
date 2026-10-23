@@ -287,6 +287,92 @@ bcm_profile_int proc key:dword, def:dword
     ret
 bcm_profile_int endp
 
+; void *bcm_page_alloc(unsigned pages, uint32_t *handle): fixed, zeroed
+; system pages (PG_SYS), any physical address; 0 on failure.
+bcm_page_alloc proc pages:dword, handle:dword
+    push ebx
+    push ecx
+    push edx
+    push esi
+    push edi
+    push 1 or 8                 ; PageZeroInit, PageFixed
+    push 0                      ; PhysAddrPtr
+    push 0                      ; max physical page
+    push 0                      ; min physical page
+    push 0                      ; alignment mask
+    push 0                      ; VM handle, unused for PG_SYS
+    push 1                      ; PG_SYS
+    push pages
+    int 20h
+    dd 00010053h                ; _PageAllocate
+    add esp, 32
+    mov ecx, handle
+    mov [ecx], eax
+    or eax, eax
+    jz page_alloc_done
+    mov eax, edx                ; linear address
+page_alloc_done:
+    pop edi
+    pop esi
+    pop edx
+    pop ecx
+    pop ebx
+    cld
+    ret
+bcm_page_alloc endp
+
+bcm_page_free proc handle:dword
+    push ebx
+    push ecx
+    push edx
+    push esi
+    push edi
+    push 0
+    push handle
+    int 20h
+    dd 00010055h                ; _PageFree
+    add esp, 8
+    pop edi
+    pop esi
+    pop edx
+    pop ecx
+    pop ebx
+    cld
+    ret
+bcm_page_free endp
+
+; uint32_t bcm_lin_to_phys(const void *linear): from the page table entry.
+bcm_lin_to_phys proc linear:dword
+    local pte:dword
+    push ebx
+    push ecx
+    push edx
+    push esi
+    push edi
+    push 0
+    lea eax, pte
+    push eax
+    push 1
+    mov eax, linear
+    shr eax, 12
+    push eax
+    int 20h
+    dd 00010061h                ; _CopyPageTable
+    add esp, 16
+    mov eax, pte
+    and eax, 0fffff000h
+    mov ecx, linear
+    and ecx, 0fffh
+    or eax, ecx
+    pop edi
+    pop esi
+    pop edx
+    pop ecx
+    pop ebx
+    cld
+    ret
+bcm_lin_to_phys endp
+
 profile_section db "BCM57DBG", 0
 
 ; Emulator debug console only; no UART or DOS services are touched.
