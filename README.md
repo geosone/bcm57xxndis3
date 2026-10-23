@@ -144,7 +144,8 @@ rein lesend. Herkunft und Lizenz: [`docs/hardware-port.md`](docs/hardware-port.m
 GPL-2.0-or-later für die adaptierten Hardwareteile, Lizenztext in `COPYING`.
 
 Als Nächstes folgen Hardwaretests der PCI-/MMIO-Diagnose und des Resets
-sowie PHY, DMA-Ringe und Paketbetrieb.
+(mit PHY-Reset, Autonegotiation und Linkerkennung) sowie DMA-Ringe und
+Paketbetrieb.
 Die geplante Proxmox-VM mit durchgereichtem BCM5722 ist noch nicht verfügbar.
 
 Die maßgebliche Hardwarebeschreibung ist

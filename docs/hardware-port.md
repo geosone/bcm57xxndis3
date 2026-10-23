@@ -57,10 +57,26 @@ für die Abarbeitung gepufferter Schreibzugriffe.
 PCI-Voraussetzungen, NVRAM-Timeout, Firmware-Timeout und Deskriptor-Layouts.
 Das belegt die Softwareverträge, nicht die elektrische Funktion auf einer Karte.
 
+`src/bcm5722_phy.c` portiert aus `PHY.cpp` den MDIO-Zugriff (mit Abschalten
+des Auto-Pollings), PHY-ID, PHY-Reset mit Auto-MDIX und Ethernet@Wirespeed,
+die Autonegotiation (10/100/1000, symmetrische Pause) sowie die Link-Auswertung
+mit Flusssteuerung, MAC-Portmodus, Duplex und TX-Längen. Nur der Gigabit-PHY
+des BCM5722; die BCM5906-Pfade und die Jitter-/Trim-Korrekturen anderer Chips
+entfallen. Korrigiert gegenüber der Vorlage: Die Wirespeed-Einstellung
+verknüpfte Fehlercodes mit `&` und verlor Fehler; bei Halbduplex blieben alte
+Flusssteuerungsbits stehen; ein Timeout beim PHY-Reset bricht ab, bevor weitere
+Register beschrieben werden. `tests/test_phy.c` simuliert MI-Schnittstelle und
+PHY, einschließlich hängendem Bus, festhängendem Resetbit und aller
+Geschwindigkeits-/Duplexkombinationen.
+
+Mit `ResetTest=1` folgen auf einen erfolgreichen Chipreset PHY-ID, PHY-Reset,
+Autonegotiation und bis zu 5 s Linkabfrage; das Protokoll nennt Geschwindigkeit,
+Duplex und Flusssteuerung. Die MAC-Engines bleiben dabei aus.
+
 `tests/test_platform.c` prüft Config-Adressen und Zugriffsbreiten sowie die
 Wartezeit gegen einen simulierten PIT mit verschiedenen Reloadwerten und
 Abfrageabständen.
 
-Noch zu portieren bzw. anzuschließen: PHY-/MDIO-Initialisierung, DMA-Allokation und -Adressübersetzung,
+Noch zu portieren bzw. anzuschließen: DMA-Allokation und -Adressübersetzung,
 RX-/TX-Ringbetrieb, IRQ-Quittierung und die vollständigen NDIS-Paketpfade.
 Die geplante Proxmox-VM mit BCM5722-Passthrough steht noch nicht zur Verfügung.

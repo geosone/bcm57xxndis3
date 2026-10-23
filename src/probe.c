@@ -3,6 +3,7 @@
 #include "pci.h"
 #include "ndis3.h"
 #include "platform.h"
+#include "bcm5722_phy.h"
 
 extern uint32_t bcm_ndis_version(void);
 extern uint32_t bcm_vmm_version(void);
@@ -39,6 +40,62 @@ static const char *const reset_results[] = {
     "NVRAM arbitration timeout", "bootcode timeout"
 };
 
+static void log_phy(const char *step, enum bcm_phy_result result)
+{
+    bcm_log_text("BCM57DBG: ResetTest: PHY ");
+    bcm_log_text(step);
+    bcm_log_text(result == BCM_PHY_OK ? " ok\r\n" :
+                 result == BCM_PHY_BUSY ? " MI busy\r\n" : " reset timeout\r\n");
+}
+
+/* After the chip reset: PHY ID, PHY reset, autonegotiation and up to 5 s of
+ * link polling. Only MAC mode, lengths and flow bits are written; the MAC
+ * engines stay disabled. */
+static void phy_test(const struct bcm_hw_io *io)
+{
+    struct bcm_mac_modes modes = {0, 0, 0};
+    struct bcm_link link;
+    enum bcm_phy_result result;
+    uint32_t id;
+    unsigned i;
+
+    result = bcm5722_phy_id(io, &id);
+    log_phy("ID", result);
+    if (result != BCM_PHY_OK)
+        return;
+    bcm_log_text("BCM57DBG: ResetTest: PHY ID=");
+    bcm_log_hex(id);
+    bcm_log_text("\r\n");
+    if ((result = bcm5722_phy_reset(io)) != BCM_PHY_OK) {
+        log_phy("reset", result);
+        return;
+    }
+    if ((result = bcm5722_phy_autoneg(io)) != BCM_PHY_OK) {
+        log_phy("autonegotiation", result);
+        return;
+    }
+    for (i = 0; i < 50; ++i) {
+        if ((result = bcm5722_phy_link(io, &modes, &link)) != BCM_PHY_OK) {
+            log_phy("link", result);
+            return;
+        }
+        if (link.up)
+            break;
+        bcm_platform_delay_us(100000);
+    }
+    bcm_log_text("BCM57DBG: ResetTest: link ");
+    if (!link.up) {
+        bcm_log_text("down after 5 s\r\n");
+        return;
+    }
+    bcm_log_text("up speed=");
+    bcm_log_hex(link.speed);
+    bcm_log_text(link.full_duplex ? " full" : " half");
+    bcm_log_text(" duplex flow=");
+    bcm_log_hex(link.flow);
+    bcm_log_text("\r\n");
+}
+
 /* Opt-in: one chip reset with bus mastering enabled; MAC engines stay off. */
 static void reset_test(const struct bcm_pci_device *card,
                        volatile uint32_t *mmio)
@@ -72,6 +129,8 @@ static void reset_test(const struct bcm_pci_device *card,
     bcm_log_text(" MAC-low=");
     bcm_log_hex(mmio[0x414 / 4]);
     bcm_log_text("\r\n");
+    if (result == BCM_HW_OK)
+        phy_test(&io);
 }
 
 void bcm_probe_init(void)
