@@ -66,4 +66,13 @@ unsigned bcm5722_stop(const struct bcm_hw_io *);
 /* Station address the bootcode loaded into MAC address register 0. */
 void bcm5722_read_mac(const struct bcm_hw_io *, uint8_t mac[6]);
 
+/* Unmasks or masks INTA in the host control register. The status block is
+ * tagged: while unmasked, the interrupt mailbox decides (bcm_irq_done). */
+void bcm5722_enable_interrupts(const struct bcm_hw_io *, int enable);
+
+/* Accepts every multicast frame (the bindings filter them) and sets or
+ * clears promiscuous mode in the caller's RX mode shadow and the chip. */
+void bcm5722_rx_filter(const struct bcm_hw_io *, uint32_t *rx_mode,
+                       int promiscuous);
+
 #endif

@@ -7,6 +7,7 @@
 
 bcm_probe_init proto c
 bcm_mac_stop proto c
+bcm_nic_shutdown proto c
 
     .code
 
@@ -23,6 +24,7 @@ control_exit:
     jne control_done
     pushad
     cld
+    call bcm_nic_shutdown       ; no DMA into memory DOS gets back
     call bcm_mac_stop
     popad
 control_done:
@@ -129,6 +131,66 @@ bcm_ndis_terminate proc handle:dword, specific:dword
     cld
     ret
 bcm_ndis_terminate endp
+
+; cdecl NDIS service: copies count stack arguments, returns EAX unchanged and
+; preserves EBX, ESI, EDI and EBP for the C caller.
+NDIS_THUNK macro name:req, service:req, count:req
+name proc
+    push ebp
+    mov ebp, esp
+    push ebx
+    push esi
+    push edi
+    i = count
+    while i gt 0
+        push dword ptr [ebp + 4 + 4 * i]
+        i = i - 1
+    endm
+    int 20h
+    dd 00280000h + service
+    if count gt 0
+    add esp, 4 * count
+    endif
+    pop edi
+    pop esi
+    pop ebx
+    pop ebp
+    cld
+    ret
+name endp
+endm
+
+    NDIS_THUNK bcm_ndis_set_timer, 0ch, 2
+    NDIS_THUNK bcm_ndis_cancel_timer, 0dh, 2
+    NDIS_THUNK bcm_ndis_initialize_interrupt, 0fh, 10
+    NDIS_THUNK bcm_ndis_remove_interrupt, 10h, 1
+    NDIS_THUNK bcm_ndis_query_packet, 1bh, 5
+    NDIS_THUNK bcm_ndis_query_buffer, 21h, 3
+    NDIS_THUNK bcm_ndis_next_buffer, 27h, 2
+    NDIS_THUNK bcm_ndis_register_adapter, 35h, 6
+    NDIS_THUNK bcm_ndis_deregister_adapter, 36h, 1
+    NDIS_THUNK bcm_ndis_complete_send, 39h, 3
+    NDIS_THUNK bcm_ndis_indicate_receive, 3dh, 8
+    NDIS_THUNK bcm_ndis_indicate_receive_complete, 3eh, 1
+    NDIS_THUNK bcm_ndis_indicate_status, 3fh, 4
+    NDIS_THUNK bcm_ndis_indicate_status_complete, 40h, 1
+
+; uint32_t bcm_lock(void): returns EFLAGS, then disables interrupts.
+bcm_lock proc
+    pushfd
+    pop eax
+    cli
+    ret
+bcm_lock endp
+
+; void bcm_unlock(uint32_t flags): re-enables interrupts if IF was set.
+bcm_unlock proc flags:dword
+    test flags, 200h
+    jz unlock_done
+    sti
+unlock_done:
+    ret
+bcm_unlock endp
 
 ; Locked mapping for the VxD lifetime. WfW tears it down on Windows exit.
 bcm_map_mmio proc physical:dword
@@ -320,6 +382,43 @@ page_alloc_done:
     cld
     ret
 bcm_page_alloc endp
+
+; void *bcm_page_alloc_contiguous(unsigned pages, uint32_t *handle): as
+; NDIS.386 allocates shared memory (aligned, contiguous, fixed, locked),
+; zeroed and below 4 GiB. VMM grants it only during initialization.
+bcm_page_alloc_contiguous proc pages:dword, handle:dword
+    local physical:dword
+    push ebx
+    push ecx
+    push edx
+    push esi
+    push edi
+    push 1 or 2 or 4 or 8 or 80h ; ZeroInit, UseAlign, Contig, Fixed, Locked
+    lea eax, physical
+    push eax                    ; PhysAddrPtr
+    push 0fffffh                ; max physical page
+    push 0                      ; min physical page
+    push 0                      ; alignment mask: one page
+    push 0                      ; VM handle, unused for PG_SYS
+    push 1                      ; PG_SYS
+    push pages
+    int 20h
+    dd 00010053h                ; _PageAllocate
+    add esp, 32
+    mov ecx, handle
+    mov [ecx], eax
+    or eax, eax
+    jz contiguous_done
+    mov eax, edx                ; linear address
+contiguous_done:
+    pop edi
+    pop esi
+    pop edx
+    pop ecx
+    pop ebx
+    cld
+    ret
+bcm_page_alloc_contiguous endp
 
 bcm_page_free proc handle:dword
     push ebx

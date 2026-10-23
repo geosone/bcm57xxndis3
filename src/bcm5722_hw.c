@@ -180,6 +180,33 @@ void bcm5722_read_mac(const struct bcm_hw_io *io, uint8_t mac[6])
     mac[5] = (uint8_t)low;
 }
 
+void bcm5722_enable_interrupts(const struct bcm_hw_io *io, int enable)
+{
+    uint32_t control = io->read32(io->context, HOST_CONTROL);
+    if (enable)
+        control &= ~INTERRUPT_MASK;
+    else
+        control |= INTERRUPT_MASK;
+    io->write32(io->context, HOST_CONTROL, control);
+    (void)io->read32(io->context, HOST_CONTROL);
+}
+
+#define MAC_HASH 0x470
+#define RX_MODE_PROMISCUOUS 0x100UL
+
+void bcm5722_rx_filter(const struct bcm_hw_io *io, uint32_t *rx_mode,
+                       int promiscuous)
+{
+    unsigned i;
+    for (i = 0; i < 4; ++i)
+        io->write32(io->context, MAC_HASH + 4 * i, 0xffffffffUL);
+    if (promiscuous)
+        *rx_mode |= RX_MODE_PROMISCUOUS;
+    else
+        *rx_mode &= ~RX_MODE_PROMISCUOUS;
+    io->write32(io->context, MAC_RX_MODE, *rx_mode);
+}
+
 static void write_mac(const struct bcm_hw_io *io, const uint8_t mac[6])
 {
     io->write32(io->context, MAC_ADDRESS_HIGH, (uint32_t)mac[0] << 8 | mac[1]);

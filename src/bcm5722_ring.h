@@ -50,6 +50,8 @@ struct bcm_rings {
     /* Free-running counters; ring index = counter % BCM_RING_ENTRIES. */
     unsigned tx_producer, tx_consumer, rx_producer, ret_consumer;
     unsigned rx_errors, rx_bad_index;
+    uint32_t irq_tag;                  /* status tag the ISR last claimed */
+    uint32_t last_tag;                 /* status tag the DPC acknowledged */
 };
 
 /* Sets the ring pointers into block (BCM_RING_BLOCK_SIZE bytes). */
@@ -75,5 +77,18 @@ typedef void (*bcm_rx_fn)(void *context, const uint8_t *frame,
  * buffers and updates the mailboxes; returns the number of return entries. */
 unsigned bcm_rx_poll(const struct bcm_hw_io *, struct bcm_rings *,
                      bcm_rx_fn deliver, void *context);
+
+/* ISR: returns 1 if the interrupt is the chip's (the status block has a tag
+ * not claimed yet, or INTA is asserted) and then masks it in the interrupt
+ * mailbox, which deasserts INTA before NDIS sends the EOI. Returns 0 for a
+ * shared IRQ raised by another device. */
+int bcm_irq_claim(const struct bcm_hw_io *, struct bcm_rings *);
+
+/* DPC: the tag to process up to; read before the rings are looked at. */
+uint32_t bcm_irq_tag(const struct bcm_rings *);
+
+/* DPC end: acknowledges everything up to tag and unmasks; a status update
+ * after tag makes the chip interrupt again. */
+void bcm_irq_done(const struct bcm_hw_io *, struct bcm_rings *, uint32_t tag);
 
 #endif

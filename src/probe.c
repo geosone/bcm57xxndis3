@@ -1,6 +1,6 @@
-/* Ring-0 preflight and MAC callback probe. No NIC register writes or DMA,
- * unless [BCM57DBG] ResetTest=1 in SYSTEM.INI asks for one reset (and PHY
- * setup); ResetTest=2 adds a DMA loopback test. */
+/* Ring-0 preflight, then the MAC registration. The probe itself only reads
+ * the card, unless [BCM57DBG] ResetTest=1 in SYSTEM.INI asks for one reset
+ * (and PHY setup); ResetTest=2 adds a DMA loopback test. */
 #include "pci.h"
 #include "ndis3.h"
 #include "platform.h"
@@ -9,9 +9,7 @@
 
 extern uint32_t bcm_ndis_version(void);
 extern uint32_t bcm_vmm_version(void);
-extern uint32_t bcm_config_read(uint32_t address);
 extern void bcm_debug_char(unsigned character);
-extern void *bcm_map_mmio(uint32_t physical);
 extern int bcm_profile_int(const char *key, int def);
 
 void bcm_log_text(const char *text)
@@ -26,15 +24,6 @@ void bcm_log_hex(uint32_t value)
     int shift;
     for (shift = 28; shift >= 0; shift -= 4)
         bcm_debug_char(digits[(value >> shift) & 15]);
-}
-
-static uint32_t read_config(void *context, unsigned bus, unsigned device,
-                            unsigned function, unsigned offset)
-{
-    (void)context;
-    return bcm_config_read(0x80000000UL | ((uint32_t)bus << 16) |
-                           ((uint32_t)device << 11) |
-                           ((uint32_t)function << 8) | (offset & 0xfc));
 }
 
 static const char *const reset_results[] = {
@@ -224,34 +213,14 @@ static void reset_test(const struct bcm_pci_device *card,
         phy_test(&io, dma);
 }
 
-void bcm_probe_init(void)
+/* Read-only description of the card; with ResetTest, the diagnostics. */
+static void probe_card(int reset)
 {
     struct bcm_pci_device card;
-    uint32_t version;
-    bcm_ndis_status status;
     uint32_t physical, pci_host, mmio_host;
     volatile uint32_t *mmio;
-    int reset;
 
-    bcm_log_text("BCM57DBG: diagnostic init; no network support\r\n");
-    bcm_log_text("BCM57DBG: VMM version raw=");
-    bcm_log_hex(bcm_vmm_version());
-    bcm_log_text("\r\n");
-    version = bcm_ndis_version();
-    bcm_log_text("BCM57DBG: NdisGetVersion raw=");
-    bcm_log_hex(version);
-    bcm_log_text(version ? "\r\n" : " (unavailable or zero)\r\n");
-    if (version) {
-        status = bcm_mac_start();
-        bcm_log_text("BCM57DBG: NdisRegisterMac status=");
-        bcm_log_hex(status);
-        bcm_log_text("\r\n");
-    }
-    reset = bcm_profile_int("ResetTest", 0);
-    bcm_log_text("BCM57DBG: ResetTest=");
-    bcm_log_hex((uint32_t)reset);
-    bcm_log_text("\r\n");
-    if (!bcm_find_5722(read_config, 0, &card)) {
+    if (!bcm_find_5722(bcm_platform_pci_read, 0, &card)) {
         bcm_log_text("BCM57DBG: BCM5722 14e4:165a not found\r\n");
         return;
     }
@@ -272,12 +241,12 @@ void bcm_probe_init(void)
     bcm_log_text(" command/status=");
     bcm_log_hex(card.command_status);
     bcm_log_text("\r\n");
-    pci_host = read_config(0, card.bus, card.device, card.function, 0x68);
+    pci_host = bcm_platform_pci_read(0, card.bus, card.device, card.function, 0x68);
     bcm_log_text("BCM57DBG: PCI host-control/ASIC=");
     bcm_log_hex(pci_host);
     bcm_log_text("\r\n");
     if (!(card.command_status & 2) ||
-            (read_config(0, card.bus, card.device, card.function, 0x4c) & 3)) {
+            (bcm_platform_pci_read(0, card.bus, card.device, card.function, 0x4c) & 3)) {
         bcm_log_text("BCM57DBG: MMIO skipped: memory decode disabled or device not in D0\r\n");
         return;
     }
@@ -310,4 +279,33 @@ void bcm_probe_init(void)
         return;
     }
     reset_test(&card, mmio, reset >= 2);
+}
+
+/* Diagnostics first: AddAdapter, called from NdisRegisterMac, takes the
+ * card into service. */
+void bcm_probe_init(void)
+{
+    uint32_t version;
+    bcm_ndis_status status;
+    int reset;
+
+    bcm_log_text("BCM57DBG: init\r\n");
+    bcm_log_text("BCM57DBG: VMM version raw=");
+    bcm_log_hex(bcm_vmm_version());
+    bcm_log_text("\r\n");
+    version = bcm_ndis_version();
+    bcm_log_text("BCM57DBG: NdisGetVersion raw=");
+    bcm_log_hex(version);
+    bcm_log_text(version ? "\r\n" : " (unavailable or zero)\r\n");
+    reset = bcm_profile_int("ResetTest", 0);
+    bcm_log_text("BCM57DBG: ResetTest=");
+    bcm_log_hex((uint32_t)reset);
+    bcm_log_text("\r\n");
+    probe_card(reset);
+    if (version) {
+        status = bcm_mac_start();
+        bcm_log_text("BCM57DBG: NdisRegisterMac status=");
+        bcm_log_hex(status);
+        bcm_log_text("\r\n");
+    }
 }

@@ -153,7 +153,7 @@ def main():
         parser.exit(1, f"WfW smoke test failed; inspect {work}\n")
     if (args.ndis or args.network_dir) and "raw=00000000" in log:
         parser.exit(1, "NDIS version query failed\n")
-    if args.network_dir and ("AddAdapter: hardware path not enabled" not in log or
+    if args.network_dir and ("AddAdapter: BCM5722 not found" not in log or
                             "NdisRegisterMac status=c0000001" not in log):
         parser.exit(1, "Expected NDIS callback and no-adapter failure were not observed\n")
     print("PASS: VxD initialized, absent hardware handled, Win16 ran, DOS returned")

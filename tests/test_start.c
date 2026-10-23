@@ -130,11 +130,31 @@ static void test_stop(void)
     assert(!memcmp(read, mac, 6));
 }
 
+static void test_filter_and_interrupts(void)
+{
+    uint32_t rx_mode = 0x01000002UL;
+    unsigned i;
+    setup();
+    bcm5722_rx_filter(&io, &rx_mode, 1);
+    for (i = 0; i < 4; ++i)
+        assert(regs[(0x470 + 4 * i) / 4] == 0xffffffffUL);
+    assert(rx_mode == 0x01000102UL && regs[0x468 / 4] == rx_mode);
+    bcm5722_rx_filter(&io, &rx_mode, 0);
+    assert(rx_mode == 0x01000002UL && regs[0x468 / 4] == rx_mode);
+
+    regs[0x68 / 4] = 0x29a;
+    bcm5722_enable_interrupts(&io, 1);
+    assert(regs[0x68 / 4] == 0x298);
+    bcm5722_enable_interrupts(&io, 0);
+    assert(regs[0x68 / 4] == 0x29a);
+}
+
 int main(void)
 {
     test_start();
     test_buffer_manager_timeout();
     test_stop();
-    puts("Start tests: rings, status block, MAC address, engine order, buffer manager timeout, stop sequence passed");
+    test_filter_and_interrupts();
+    puts("Start tests: rings, status block, MAC address, engine order, buffer manager timeout, stop sequence, RX filter, interrupt mask passed");
     return 0;
 }

@@ -3,6 +3,9 @@
 #define MAILBOX_STD_PRODUCER 0x26c
 #define MAILBOX_RETURN1_CONSUMER 0x284
 #define MAILBOX_TX_PRODUCER 0x304
+#define MAILBOX_INTERRUPT 0x204
+#define PCI_STATE 0x70
+#define PCI_STATE_INT_NOT_ACTIVE 2UL
 #define RING_MASK (BCM_RING_ENTRIES - 1)
 
 static void copy(uint8_t *to, const uint8_t *from, unsigned length)
@@ -38,6 +41,7 @@ void bcm_rings_init(struct bcm_rings *r)
     r->tx_producer = r->tx_consumer = r->ret_consumer = 0;
     r->rx_producer = BCM_RX_BUFFERS;
     r->rx_errors = r->rx_bad_index = 0;
+    r->irq_tag = r->last_tag = 0;
 }
 
 int bcm_tx_send(const struct bcm_hw_io *io, struct bcm_rings *r,
@@ -108,4 +112,28 @@ unsigned bcm_rx_poll(const struct bcm_hw_io *io, struct bcm_rings *r,
                     r->rx_producer & RING_MASK);
     }
     return count;
+}
+
+int bcm_irq_claim(const struct bcm_hw_io *io, struct bcm_rings *r)
+{
+    uint32_t tag = r->status->tag;
+    if (tag == r->irq_tag &&
+            (io->read32(io->context, PCI_STATE) & PCI_STATE_INT_NOT_ACTIVE))
+        return 0;
+    io->write32(io->context, MAILBOX_INTERRUPT, 1);
+    (void)io->read32(io->context, MAILBOX_INTERRUPT);
+    r->irq_tag = tag;
+    return 1;
+}
+
+uint32_t bcm_irq_tag(const struct bcm_rings *r)
+{
+    return r->status->tag;
+}
+
+void bcm_irq_done(const struct bcm_hw_io *io, struct bcm_rings *r,
+                  uint32_t tag)
+{
+    r->last_tag = tag;
+    io->write32(io->context, MAILBOX_INTERRUPT, tag << 24);
 }

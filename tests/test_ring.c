@@ -16,16 +16,32 @@ static uint8_t *lin(uint32_t phys)
     return memory + (phys - PHYS_BASE);
 }
 
+/* Interrupt line: asserted while the chip has an unacknowledged update and
+ * the mailbox does not mask it; PCI state bit 1 reads "not active". */
+static uint32_t mailbox_irq = 1;
+static int chip_wants_irq;
+
+static int inta(void)
+{
+    return chip_wants_irq && !(mailbox_irq & 1);
+}
+
 static uint32_t read32(void *context, unsigned offset)
 {
-    (void)context; (void)offset;
-    assert(0);
-    return 0;
+    (void)context;
+    if (offset == 0x70)
+        return inta() ? 0 : 2;
+    assert(offset == 0x204);
+    return mailbox_irq;
 }
 
 static void write32(void *context, unsigned offset, uint32_t value)
 {
     (void)context;
+    if (offset == 0x204) {
+        mailbox_irq = value;
+        return;
+    }
     assert(value < BCM_RING_ENTRIES);
     ++mailbox_writes;
     if (offset == 0x304) mailbox_tx = value;
@@ -213,6 +229,58 @@ static void test_rx_errors(void)
     assert(mailbox_writes == writes);                   /* nothing to report */
 }
 
+/* Tagged status: the chip bumps the tag with each status block update and
+ * keeps INTA asserted until the mailbox acknowledges that tag. */
+static void chip_update(void)
+{
+    r.status->tag = (r.status->tag + 1) & 0xff;
+    chip_wants_irq = 1;
+}
+
+static void chip_check_ack(void)
+{
+    if (mailbox_irq != 1 && (mailbox_irq >> 24) == r.status->tag)
+        chip_wants_irq = 0;
+}
+
+static void test_interrupts(void)
+{
+    uint32_t tag;
+    setup();
+    mailbox_irq = 0;
+    chip_wants_irq = 0;
+    /* Another device on a shared line: not claimed, mailbox untouched. */
+    assert(!bcm_irq_claim(&io, &r) && mailbox_irq == 0);
+
+    chip_update();
+    assert(inta());
+    assert(bcm_irq_claim(&io, &r));
+    assert(mailbox_irq == 1 && !inta());     /* masked before the EOI */
+    /* The other device again while our DPC is pending: not ours. */
+    assert(!bcm_irq_claim(&io, &r));
+
+    tag = bcm_irq_tag(&r);
+    chip_update();                           /* more work meanwhile */
+    bcm_irq_done(&io, &r, tag);
+    chip_check_ack();
+    assert(r.last_tag == tag && mailbox_irq == tag << 24);
+    /* The newer tag was not acknowledged: the chip interrupts again. */
+    assert(inta() && bcm_irq_claim(&io, &r));
+    tag = bcm_irq_tag(&r);
+    bcm_irq_done(&io, &r, tag);
+    chip_check_ack();
+    assert(!inta() && !bcm_irq_claim(&io, &r));
+
+    /* Tag wrap-around. */
+    r.status->tag = 0xff;
+    r.irq_tag = 0xff;
+    chip_update();
+    assert(r.status->tag == 0 && bcm_irq_claim(&io, &r));
+    bcm_irq_done(&io, &r, bcm_irq_tag(&r));
+    chip_check_ack();
+    assert(!inta() && mailbox_irq == 0);
+}
+
 int main(void)
 {
     test_init();
@@ -220,6 +288,7 @@ int main(void)
     test_tx_full();
     test_rx_posting();
     test_rx_errors();
-    puts("Ring tests: ring setup, 2000-frame loopback through a simulated chip, send limits, receive posting and errors passed");
+    test_interrupts();
+    puts("Ring tests: ring setup, 2000-frame loopback through a simulated chip, send limits, receive posting and errors, tagged interrupts passed");
     return 0;
 }

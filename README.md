@@ -1,14 +1,17 @@
 # BCM5722-Treiber für Windows for Workgroups 3.11
 
 Ziel ist ein nativer NDIS-3.0-Netzwerktreiber im `.386`-Format für den
-Broadcom NetXtreme BCM5722 (`14e4:165a`). Der Repository-Ordnername legt keine
-Chipfamilie fest. Ein funktionsfähiger WfW-Treiber liegt noch nicht vor.
+Broadcom NetXtreme BCM5722 (`14e4:165a`). Der Repository-Name legt keine
+Chipfamilie fest. Der NDIS-Pfad ist vollständig implementiert, wurde aber
+bisher nur gegen Simulationen und ohne Karte unter WfW getestet.
 
 ## Build und Tests
 
-Der erste Build erzeugt `build/BCM57DBG.386`: ein Diagnose-VxD, noch keinen
-Netzwerkkartentreiber. Es protokolliert VMM-/NDIS-Versionen, erprobt den NDIS-MAC-Anmeldepfad und sucht den BCM5722
-über PCI-Konfigurationsmechanismus 1. Es liest BDF, Revision, BARs, Subsystem und
+Der Build erzeugt `build/BCM57DBG.386`. Beim Start protokolliert er
+VMM- und NDIS-Versionen und sucht den BCM5722 über
+PCI-Konfigurationsmechanismus 1. Danach meldet er sich als NDIS-3.0-MAC an.
+`AddAdapter` setzt die Karte zurück, richtet PHY, DMA-Ringe und den geteilten
+Interrupt ein und registriert den Adapter. Es liest BDF, Revision, BARs, Subsystem und
 IRQ und kann bei bereits eingeschaltetem Memory Decode lesend auf die
 MMIO-Register zugreifen, ohne die Karte zu aktivieren oder DMA zu starten. Ausgabe: Emulator-Port
 `0xE9`; daraus entsteht auf realer Hardware noch keine sichtbare Anzeige.
@@ -27,8 +30,10 @@ Auf diesem Rechner ist der passende Linker:
 `WATCOM`, `CC386`, `ASM`, `LINK386` und `HOST_CC` sind überschreibbar.
 `make clean` entfernt ausschließlich `build/`.
 
-`make check` prüft PCI-Erkennung und BARs, NDIS-Lebenszyklus und ABI sowie
-Hardware-Resetsequenzen mit simulierten Registern und LE-Objekte/DDB. Der Build markiert
+`make check` prüft PCI-Erkennung und BARs, NDIS-Lebenszyklus und ABI, die
+Bindungsschicht (Filter, Senden, Loopback, TransferData, OIDs, Reset) sowie
+Hardware-Resetsequenzen, PHY, Ringe und Interrupts mit simulierten Registern
+und LE-Objekte/DDB. Der Build markiert
 32-Bit-Datenobjekte explizit als ausführbar, wie vom Windows-3.x-VxD-Lader
 benötigt. `src/` enthält C-/Assemblerquellen, `tests/` Hosttests und den
 Win16-Testhelfer, `tools/` Formatprüfung und Emulatorlauf, `docs/` Referenzbefunde.
@@ -58,7 +63,7 @@ make smoke LINK386=/pfad/zu/jwlink WFW_IMAGE=/pfad/zu/wfw.img NETWORK_DIR=build/
 
 Dieser Lauf verwendet Microsofts NE2000 und NetBEUI als eingerichtete
 Referenzumgebung. Unser eigener `AddAdapter`-Callback muss erreicht werden
-und mangels implementierter Hardwareanbindung noch ablehnen. Der CPU-Fix
+und mangels BCM5722 in QEMU ablehnen. Der CPU-Fix
 aus patcher9x betrifft nur die neu expandierte NDIS-Testdatei; die MIT-Lizenz
 liegt unter `LICENSES/`. Die Originalmedien werden nicht verändert.
 
@@ -130,23 +135,33 @@ Ergebnisse des Assembler-Probeaufrufs stehen in
 
 ## Aktueller Prüfstand
 
-Der Diagnosebuild, die Hosttests und der WfW-Ladetest bestehen. In der
-Netzwerktestumgebung meldet NDIS `0x0300` und ruft unseren `AddAdapter` auf.
-Dieser verweigert die Anmeldung bis zur fertigen Hardwareanbindung; es gibt
-noch keine erfolgreiche Protokollbindung oder Paketübertragung.
-Details stehen in [`docs/runtime-tests.md`](docs/runtime-tests.md).
+Schritte 1–4 sind umgesetzt. Die WfW-NDIS-Schnittstelle wurde aus den
+WfW-Originaldateien und einem PCI-Busmaster-MAC von 1998 rekonstruiert:
+[`docs/wfw-ndis-abi.md`](docs/wfw-ndis-abi.md). Der Treiber besteht aus
+folgenden Teilen:
+
+- `src/adapter.c`: Bindungen mit eigenen Paketfiltern und Multicast-Listen,
+  Sendewarteschlange, Loopback, Empfang mit TransferData, OIDs und Reset.
+  Als Vorbild diente LANCE aus dem NT-3.1-DDK.
+- `src/nic.c`: `AddAdapter`/`RemoveAdapter`, ISR und DPC mit
+  Tagged-Statusblock, Link-Abfrage im Sekundentakt. Bei `System_Exit` werden
+  Interrupts und DMA gestoppt.
+- `src/bcm5722_*.c`: Reset, PHY, Ringe und Start der Hardware.
+
+Hosttests und der WfW-Lauf ohne Karte bestehen; Details stehen in
+[`docs/runtime-tests.md`](docs/runtime-tests.md).
 
 Der Resetpfad und Deskriptorlayouts wurden aus dem vom Nutzer genannten
-[`chris1111/BCM5722D`](https://github.com/chris1111/BCM5722D) nach C portiert
-und mit simulierten Registern getestet. Der Diagnosebuild führt den Reset nur mit
-`[BCM57DBG] ResetTest=1` in der SYSTEM.INI aus; ohne den Schalter bleibt er
-rein lesend. Herkunft und Lizenz: [`docs/hardware-port.md`](docs/hardware-port.md),
-GPL-2.0-or-later für die adaptierten Hardwareteile, Lizenztext in `COPYING`.
+[`chris1111/BCM5722D`](https://github.com/chris1111/BCM5722D) nach C portiert.
+Mit `[BCM57DBG] ResetTest=1` (oder `=2` mit DMA-Loopback) in der SYSTEM.INI
+läuft vor der Anmeldung zusätzlich die Diagnose. Herkunft und Lizenz:
+[`docs/hardware-port.md`](docs/hardware-port.md), GPL-2.0-or-later für die
+adaptierten Hardwareteile, Lizenztext in `COPYING`.
 
-Als Nächstes folgen Hardwaretests der PCI-/MMIO-Diagnose und des Resets
-(mit PHY-Reset, Autonegotiation und Linkerkennung, `ResetTest=2` zusätzlich
-DMA-Ringe im internen Loopback) sowie Interrupts und der NDIS-Paketbetrieb.
-Die geplante Proxmox-VM mit durchgereichtem BCM5722 ist noch nicht verfügbar.
+Als Nächstes folgen der Test auf echter Hardware (Link, ARP, Ping,
+Dateitransfer, wiederholtes Starten und Beenden von Windows) und eine
+`OEMSETUP.INF` für die WfW-Netzwerkeinrichtung. Die geplante Proxmox-VM mit
+durchgereichtem BCM5722 ist noch nicht verfügbar.
 
 Die maßgebliche Hardwarebeschreibung ist
 [`5722-PG101-R` vom 15.10.2007](https://www.manualslib.com/manual/3455622/Broadcom-Bcm5722.html).

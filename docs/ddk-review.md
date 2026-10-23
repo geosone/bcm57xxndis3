@@ -147,10 +147,9 @@ Die NT-Aufrufkonventionen (stdcall, NT-Typen) gelten für WfW nicht; die
 Dienste werden weiter über unsere cdecl-Thunks angesprochen. Kein Quellcode
 wurde in dieses Repository kopiert.
 
-## Nächster Umsetzungsschritt
+## WfW-eigene Befunde
 
-Die WfW-3.11-Aufrufkonventionen, Strukturen und Dienstnummern anhand zeitgerechter
-Header bzw. Dokumentation absichern. Danach eine kleine Start- und NDIS-Anbindung
-mit passender Toolchain erstellen. Erst nach erfolgreichem Laden unter WfW folgt
-der Broadcom-Hardwareteil. Die DDK-Originale bleiben externe Referenzen; es wurde
-kein Microsoft-Quellcode in dieses Repository kopiert.
+Da kein WfW-NDIS-DDK vorliegt, wurden Layouts, Argumentreihenfolgen und das
+Interrupt-, Timer- und Speicherverhalten aus `NDIS.386`, den MACs der
+WfW-Disketten und einem PCI-Busmaster-MAC von 1998 bestimmt:
+[`docs/wfw-ndis-abi.md`](wfw-ndis-abi.md).

@@ -12,6 +12,17 @@ static uint32_t config_address(const struct bcm_platform *p, unsigned offset)
            (offset & 0xff);
 }
 
+uint32_t bcm_platform_pci_read(void *context, unsigned bus, unsigned device,
+                               unsigned function, unsigned offset)
+{
+    struct bcm_platform p;
+    (void)context;
+    p.bus = bus;
+    p.device = device;
+    p.function = function;
+    return bcm_config_read(config_address(&p, offset & 0xfc));
+}
+
 static uint32_t mmio_read32(void *context, unsigned offset)
 {
     struct bcm_platform *p = context;
@@ -94,14 +105,22 @@ static int contiguous(const uint8_t *linear, unsigned pages)
     return 1;
 }
 
-int bcm_platform_dma_alloc(struct bcm_rings *r)
+/* The ring block: one PageContig allocation, as NDIS.386 does for shared
+ * memory. VMM grants that only during system initialization; later, ordinary
+ * pages are tried, as they are only sometimes contiguous. A non-contiguous
+ * block stays allocated until the next try is done, so that the next
+ * allocation cannot return the same pages. */
+static uint8_t *ring_block(void)
 {
     uint32_t failed[8];
     unsigned tries, i;
-    uint8_t *block = 0, *buffers;
+    uint8_t *block = bcm_page_alloc_contiguous(RING_PAGES, &ring_handle);
 
-    /* A non-contiguous block stays allocated until the next try is done, so
-     * that the next allocation cannot return the same pages. */
+    if (block && contiguous(block, RING_PAGES))
+        return block;
+    if (block)
+        bcm_page_free(ring_handle);
+    block = 0;
     for (tries = 0; tries < 8; ++tries) {
         block = bcm_page_alloc(RING_PAGES, &ring_handle);
         if (!block)
@@ -113,10 +132,18 @@ int bcm_platform_dma_alloc(struct bcm_rings *r)
     }
     for (i = 0; i < tries; ++i)
         bcm_page_free(failed[i]);
-    if (!block) {
+    if (!block)
         ring_handle = 0;
+    return block;
+}
+
+int bcm_platform_dma_alloc(struct bcm_rings *r)
+{
+    unsigned i;
+    uint8_t *block = ring_block(), *buffers;
+
+    if (!block)
         return -1;
-    }
     buffers = bcm_page_alloc(BUFFER_PAGES, &buffer_handle);
     if (!buffers) {
         bcm_page_free(ring_handle);

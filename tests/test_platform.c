@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 #include "platform.h"
 #include "bcm5722_ring.h"
 
@@ -98,7 +99,23 @@ static void test_delay(void)
  * are scattered unless the allocation number is in contiguous_from on. */
 static uint8_t arena[64][4096 * 48];
 static unsigned allocations, frees, contiguous_from, fail_at;
+static unsigned contiguous_calls, contiguous_works;
+static int forced_contiguous[64];
 static uint32_t freed[64];
+
+/* PageContig: refused unless contiguous_works. */
+void *bcm_page_alloc_contiguous(unsigned pages, uint32_t *handle)
+{
+    assert(pages == BCM_RING_BLOCK_SIZE / 4096 && allocations < 64);
+    ++contiguous_calls;
+    if (!contiguous_works) {
+        *handle = 0;
+        return 0;
+    }
+    forced_contiguous[allocations] = 1;
+    *handle = 0x1000 + allocations;
+    return arena[allocations++];
+}
 
 void *bcm_page_alloc(unsigned pages, uint32_t *handle)
 {
@@ -126,7 +143,7 @@ uint32_t bcm_lin_to_phys(const void *linear)
     unsigned offset = (unsigned)((p - arena[a]) % sizeof(arena[0]));
     unsigned page = offset / 4096;
     assert(a < 64);
-    if (a + 1 >= contiguous_from)
+    if (a + 1 >= contiguous_from || forced_contiguous[a])
         return 0x00400000UL + a * 0x40000UL + offset;
     /* Pages in reverse order: physically scattered. */
     return 0x00400000UL + a * 0x40000UL + (47 - page) * 4096UL + offset % 4096;
@@ -134,7 +151,8 @@ uint32_t bcm_lin_to_phys(const void *linear)
 
 static void dma_case(unsigned contiguous_on, unsigned fail)
 {
-    allocations = frees = 0;
+    allocations = frees = contiguous_calls = contiguous_works = 0;
+    memset(forced_contiguous, 0, sizeof(forced_contiguous));
     contiguous_from = contiguous_on;
     fail_at = fail;
     bcm_platform_dma_free();
@@ -146,10 +164,21 @@ static void test_dma(void)
     struct bcm_rings r;
     unsigned i;
 
-    /* Third ring block is contiguous: two retries, both freed. */
+    /* PageContig granted: one ring allocation, no retries. */
+    dma_case(1000, 0);
+    contiguous_works = 1;
+    assert(bcm_platform_dma_alloc(&r) == 0);
+    assert(contiguous_calls == 1 && allocations == 2 && frees == 0);
+    assert(r.block_phys == bcm_lin_to_phys(arena[0]));
+    assert(r.rx_buffer[0] == arena[1]);
+    bcm_platform_dma_free();
+    assert(frees == 2);
+
+    /* PageContig refused, third ordinary block contiguous: two retries,
+     * both freed. */
     dma_case(3, 0);
     assert(bcm_platform_dma_alloc(&r) == 0);
-    assert(allocations == 4 && frees == 2);
+    assert(contiguous_calls == 1 && allocations == 4 && frees == 2);
     assert(freed[0] == 0x1000 && freed[1] == 0x1001);
     assert(r.block_phys == bcm_lin_to_phys(arena[2]));
     assert((uint8_t *)r.status == arena[2] + BCM_RING_STATUS_OFFSET);

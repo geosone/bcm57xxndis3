@@ -105,3 +105,18 @@ IRQ-Quittierung sowie die NDIS-Pfade (Open/Close, Send, Empfangsanzeige mit
 TransferData, Anfragen, Paketfilter, Loopback) nach dem Vorbild von LANCE aus
 dem NT-3.1-DDK.
 Die geplante Proxmox-VM mit BCM5722-Passthrough steht noch nicht zur Verfügung.
+
+Interrupts und Filter (Schritt 4) stammen nicht aus BCM5722D, sondern aus
+dem Programmierhandbuch und der Registerbedeutung in Linux `tg3`; Code
+wurde nicht übernommen. Der Treiber nutzt den Tagged-Statusblock, den der
+Host-Control-Wert 0x29a einschaltet:
+
+- **ISR:** Sie beansprucht den Interrupt nur bei neuem Tag oder bei aktivem
+  INTA (PCI-State 0x70, Bit 1) und maskiert dann über Mailbox 0x204 = 1.
+- **DPC:** Er quittiert mit `Tag << 24`.
+- **Filter:** Die Multicast-Hash-Register 0x470–0x47C nehmen jeden
+  Multicast an; Promiscuous ist Bit 8 in RX_MODE.
+
+Ringblock-Speicher: Zuerst wird `_PageAllocate` mit PageContig versucht,
+wie NDIS.386 für gemeinsamen Speicher. Nur wenn das scheitert, greifen die
+Wiederholungen mit gewöhnlichen Seiten.

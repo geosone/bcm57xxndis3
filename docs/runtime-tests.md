@@ -1,7 +1,8 @@
 # Diagnosebuild: Prüfstand
 
-Stand: 22. Oktober 2026. Artefakt: `build/BCM57DBG.386`.
-Es handelt sich um einen Diagnosebuild, noch ohne Paketübertragung.
+Stand: 24. Oktober 2026. Artefakt: `build/BCM57DBG.386`.
+Der Build enthält den vollständigen NDIS-Pfad. Ohne Karte lehnt `AddAdapter`
+ab; auf echter Hardware ist der Paketbetrieb noch nicht geprüft.
 
 ## Hosttests und Dateiformat
 
@@ -9,9 +10,20 @@ Es handelt sich um einen Diagnosebuild, noch ohne Paketübertragung.
 make check LINK386=/home/mario/mars/jwlink-fork/build/jwlinkLR/jwlink
 ```
 
-Bestanden: PCI-Erkennung und BAR-Auswertung, bytegepackte NDIS-Callback-Tabelle,
-Anmelde-/Abmelde-Lebenszyklus mit Fehlerbehandlung sowie simulierte
-Hardware-Resetsequenz und Timeout-Fälle. Die LE-Prüfung bestätigt DDB,
+Bestanden: PCI-Erkennung und BAR-Auswertung, bytegepackte NDIS-Strukturen,
+Anmelde-/Abmelde-Lebenszyklus mit `AddAdapter` innerhalb der Anmeldung und
+Fehlerbehandlung, simulierte Hardware-Resetsequenz, Timeout-Fälle, PHY, Ringe
+und Tagged-Status-Interrupts. Dazu kommt die Bindungsschicht (`test_adapter`):
+
+- Medienwahl, Paketfilter und Multicast-Listen pro Binding
+- TransferData über Pufferketten
+- Sendewarteschlange mit erhaltener Reihenfolge und Abbruch beim Schließen
+- verzögertes Loopback, auch bei Sendeaufrufen aus einer Indication heraus
+- OIDs und Reset
+- keine NDIS-Aufrufe bei gesperrten Interrupts
+
+Neun Mutationsproben (unter anderem falsches Tag in der ISR, Loopback-Zelle
+zu früh freigegeben, Senden an der Warteschlange vorbei) schlagen alle fehl. Die LE-Prüfung bestätigt DDB,
 Exportordinal, 32-Bit-Objekte, MAC-Initialisierungsreihenfolge und NDIS-Dienstaufruf.
 Die Binärdatei benötigt keine externen C-Laufzeitbibliotheken.
 
@@ -54,16 +66,19 @@ Die Originalmedien bleiben unverändert.
 Nachgewiesener Ablauf:
 
 ```text
+BCM57DBG: init
 BCM57DBG: VMM version raw=0000030b
 BCM57DBG: NdisGetVersion raw=00000300
-BCM57DBG: AddAdapter: hardware path not enabled
-BCM57DBG: NdisRegisterMac status=c0000001
+BCM57DBG: ResetTest=00000001
 BCM57DBG: BCM5722 14e4:165a not found
+BCM57DBG: AddAdapter: BCM5722 not found
+BCM57DBG: NdisRegisterMac status=c0000001
 ```
 
 `NdisInitializeWrapper` und `NdisRegisterMac` erreichen damit die echten WfW-
-NDIS-Dienste und den C-Callback. Weil `AddAdapter` noch keinen betriebsbereiten
-Hardwareadapter bereitstellt, weist er die Anmeldung zurück. `c0000001` ist
+NDIS-Dienste und den C-Callback. Die Diagnose läuft vor der Anmeldung, weil
+`AddAdapter` die Karte in Betrieb nimmt. Ohne BCM5722 weist `AddAdapter`
+die Anmeldung zurück. `c0000001` ist
 hier der erwartete Fehler, **keine erfolgreiche MAC-/Protokollbindung**. Die
 Wrapperressourcen werden freigegeben, die Win16-Testanwendung startet und
 Windows kehrt zu DOS zurück.
@@ -84,8 +99,16 @@ Der Smoke-Test trägt `[BCM57DBG] ResetTest=1` ein und erwartet
 
 ## Ausstehend
 
-Auf dem Entwicklungsrechner fehlt die echte BCM5722-Karte. Der lesende MMIO-
-Probelauf, Reset/PHY, DMA, Hardwareinterrupts und Paketübertragung sind noch
-nicht auf realer Hardware geprüft. Der Resetcode ist an die WfW-Plattform
-angeschlossen, lief aber bisher nur gegen simulierte Register; ohne
-`ResetTest=1` schreibt der Diagnosebuild keine NIC-Register.
+Auf dem Entwicklungsrechner fehlt die echte BCM5722-Karte. QEMU emuliert
+keinen BCM57xx. Folgende Teile liefen bisher nur gegen Simulationen und sind
+auf realer Hardware noch nicht geprüft:
+
+- der MMIO-Probelauf
+- Reset und PHY, DMA
+- `AddAdapter` mit Hardwareinterrupts
+- der Paketbetrieb
+
+Für den Hardwaretest wird die Karte in `PROTOCOL.INI` an NetBEUI gebunden,
+voraussichtlich mit `DriverName=BCM57DBG$`. Das ist aus NE2000 abgeleitet: Es
+meldet den MAC-Namen „Ne2000“ an, die Testumgebung trägt `NE2000$` ein. Die
+Installation über eine `OEMSETUP.INF` folgt noch.
