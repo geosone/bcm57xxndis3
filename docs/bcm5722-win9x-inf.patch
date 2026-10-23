@@ -1,0 +1,24 @@
+--- original/b57w9x.inf
+
++++ modified/b57w9x.inf
+
+@@ -79,6 +79,8 @@
+
+ 
+ %BCM5750A1%   = BCM5750A1.Inst,   PCI\VEN_14e4&DEV_1677&SUBSYS_267610f1
+ 
++%BCM5722%     = BCM5750A1.Inst,  PCI\VEN_14e4&DEV_165A
++%BCM5722%     = BCM5750A1.Inst,  PCI\VEN_14e4&DEV_165A&SUBSYS_02A61028
+ 
+ 
+ %BCM5755%   = BCM5750A1.Inst,   PCI\VEN_14e4&DEV_167B&SUBSYS_100F17AA
+@@ -1130,6 +1132,8 @@
+
+ BCM5750B0F          = "Broadcom NetXtreme Fast Ethernet"
+ BCM5754             = "Broadcom NetXtreme Gigabit Ethernet"
+ BCM5755           = "Broadcom NetXtreme Gigabit Ethernet"
++BCM5722             = "Broadcom NetXtreme Gigabit Ethernet"
++
+ 
+ BCM5901             = "Broadcom NetXtreme Fast Ethernet"
+ BCM5906             = "Broadcom NetLink (TM) Fast Ethernet"
