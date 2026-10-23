@@ -1,0 +1,20 @@
+; OEMSETUP.INF for the Broadcom NetXtreme BCM5722 (PCI-E Gigabit Ethernet)
+; Windows for Workgroups 3.11: Network Setup > Drivers > Add Adapter >
+; "Unlisted or Updated Network Adapter", path to this disk.
+;
+; Expected PROTOCOL.INI entries after Setup (the NDIS side is smoke-tested):
+;   [BCM5722]   DriverName=B57$       (adapter section, protocols bind to it)
+;   [BCM57DBG]  Adapters=BCM5722      (NDIS.386 hands this name to AddAdapter)
+;
+; The NDIS3 driver ignores DriverName. B57$ is the name used by Broadcom's
+; NDIS2 driver B57.DOS. To use it as the real-mode driver, put B57.DOS
+; on this disk and add "ndis2=7:b57.dos" to [bcm5722].
+
+[netcard]
+bcm5722="Broadcom NetXtreme BCM5722 Gigabit Ethernet",000,ndis,ethernet,0x07,bcm5722,bcm5722_nif
+
+[bcm5722]
+ndis3=7:bcm57dbg.386
+
+[bcm5722_nif]
+drivername=B57$

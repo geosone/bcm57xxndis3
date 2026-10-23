@@ -75,7 +75,9 @@ static void mac_remove(bcm_ndis_handle adapter)
 static struct bcm_mac_characteristics characteristics = {
     3, 0, 0, mac_open, mac_close, mac_send, mac_transfer, mac_reset,
     mac_request, mac_statistics, mac_unload, mac_add, mac_remove,
-    {8, 9, mac_name}
+    /* WfW counts the NUL (NE2000: "Ne2000" is 7/7). NdisOpenConfiguration
+     * copies Length bytes as the PROTOCOL.INI section name to look up. */
+    {sizeof(mac_name), sizeof(mac_name), mac_name}
 };
 
 bcm_ndis_status bcm_mac_start(void)

@@ -49,6 +49,19 @@ er fehl, scheitert die Anmeldung mit `0xc0000001`. NE2000 übergibt als
 MacMacContext die Adresse seiner MacHandle-Variablen und liest sie in
 `AddAdapter`. NDIS hat sie zu diesem Zeitpunkt also schon gefüllt.
 
+**Zeichenketten.** In WfW zählt `NDIS_STRING.Length` die abschließende Null
+mit: NE2000 meldet „Ne2000“ mit Length=MaximumLength=7, SMCND ebenso.
+`NdisOpenConfiguration` kopiert genau `Length` Byte als Abschnittsnamen. Ohne
+mitgezählte Null fehlt das Ende des Namens, und die Abschnittssuche scheitert.
+
+**`PROTOCOL.INI`.** NDIS liest `protocol.ini` bei seinem eigenen
+`Device_Init` über VMM `OpenFile` (bei Misserfolg im Verzeichnis von
+`WIN386.EXE`) und hält Abschnitte und Schlüssel in VMM-Listen. Die Suche
+wandelt Abschnitts- und Schlüsselnamen in Großbuchstaben um. `NdisRegisterMac`
+öffnet den Abschnitt mit dem MAC-Namen und liest `Adapters` als Liste. Für
+jeden Eintrag ruft es `AddAdapter` mit diesem Namen auf und zählt die Erfolge.
+Fehlt der Schlüssel, folgt ein einziger Aufruf mit dem MAC-Namen.
+
 **`NdisRegisterAdapter`.** MacHandle und MacAdapterContext müssen ungleich
 NULL sein, der Adaptername darf nicht leer sein. Die Adapterinformation darf
 fehlen oder 0 Ports haben. Für jeden Port wird `*PortOffset = InitialPort`
@@ -101,5 +114,7 @@ seinen zusammenhängenden RX-Ring (0x4650 Byte) und seine TX-Puffer.
   der Statusblock ein neues Tag hat oder INTA aktiv ist.
 - Loopback und Link-Abfrage laufen über 0-ms-Timer, also als Events. Ein
   1-s-Time-out stößt nur die Link-Abfrage an.
+- Der MAC-Name `BCM57DBG` wird mit Length=MaximumLength=9 angemeldet;
+  `PROTOCOL.INI` erhält `[BCM57DBG] Adapters=BCM5722` (siehe `inf/OEMSETUP.INF`).
 - WfW hat keine Ethernet-Filterbibliothek; Paketfilter und Multicast-Listen
   pro Binding verwaltet `src/adapter.c`.

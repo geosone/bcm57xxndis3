@@ -82,7 +82,10 @@ def main():
                     "[protman]\nDriverName=PROTMAN$\nPRIORITY=MS$NETBEUI\n"
                     "[MS$NE2000]\nDriverName=NE2000$\nIRQ=3\nIOBASE=0x300\n"
                     "[MS$NETBEUI]\nDriverName=netbeui$\nBindings=MS$NE2000\n"
-                    "LANABASE=0\n")
+                    "LANABASE=0\n"
+                    # As inf/OEMSETUP.INF: NDIS.386 passes BCM5722 to AddAdapter.
+                    "[BCM5722]\nDriverName=B57$\n"
+                    "[BCM57DBG]\nAdapters=BCM5722\n")
         (work / "PROTOCOL.INI").write_bytes(protocol.replace("\n", "\r\n").encode())
         mcopy(work / "PROTOCOL.INI", "::/WINDOWS/PROTOCOL.INI")
     # Exercises Get_Profile_Decimal_Int; without a BCM5722 nothing is reset.
@@ -154,7 +157,8 @@ def main():
     if (args.ndis or args.network_dir) and "raw=00000000" in log:
         parser.exit(1, "NDIS version query failed\n")
     if args.network_dir and ("AddAdapter: BCM5722 not found" not in log or
-                            "NdisRegisterMac status=c0000001" not in log):
+                             "AddAdapter name=BCM5722" not in log or
+                             "NdisRegisterMac status=c0000001" not in log):
         parser.exit(1, "Expected NDIS callback and no-adapter failure were not observed\n")
     print("PASS: VxD initialized, absent hardware handled, Win16 ran, DOS returned")
 

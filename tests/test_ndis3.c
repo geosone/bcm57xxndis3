@@ -79,7 +79,7 @@ void bcm_ndis_register(bcm_ndis_status *status, bcm_ndis_handle *handle,
     bcm_ndis_status result;
     assert(wrapper == &initialized && context == handle);
     assert(size == sizeof(*mac) && mac->major == 3 && mac->minor == 0);
-    assert(mac->reserved == 0 && mac->name.length == 8);
+    assert(mac->reserved == 0 && mac->name.length == 9);
     assert(mac->name.maximum_length == 9 && !strcmp(mac->name.buffer, "BCM57DBG"));
     ++registered;
     registered_mac = mac;

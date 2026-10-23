@@ -9,7 +9,7 @@ PYTHON ?= python3
 OUT := build
 CFLAGS386 := -q -3s -mf -ecc -s -zl -zls -ox -w4 -Isrc -I$(WATCOM)/h
 
-.PHONY: all check smoke network-fixture clean
+.PHONY: all check smoke disk network-fixture clean
 all: $(OUT)/BCM57DBG.386
 
 $(OUT):
@@ -68,6 +68,11 @@ $(OUT)/WFWEXIT.EXE: tests/wfw_exit.c | $(OUT)
 
 smoke: all $(OUT)/WFWEXIT.EXE
 	$(PYTHON) tools/smoke_wfw.py "$(WFW_IMAGE)" $(if $(NDIS_IMAGE),--ndis "$(NDIS_IMAGE)") $(if $(VNETSUP_IMAGE),--vnetsup "$(VNETSUP_IMAGE)") $(if $(IFSHLP_IMAGE),--ifshlp "$(IFSHLP_IMAGE)") $(if $(NETWORK_DIR),--network-dir "$(NETWORK_DIR)")
+
+# Contents of the WfW setup disk: driver and OEMSETUP.INF side by side.
+disk: all
+	mkdir -p $(OUT)/disk
+	cp $(OUT)/BCM57DBG.386 inf/OEMSETUP.INF $(OUT)/disk/
 
 $(OUT)/expand_kwaj: tools/expand_kwaj.c | $(OUT)
 	$(HOST_CC) -Wall -Wextra -Werror $< -lmspack -o $@

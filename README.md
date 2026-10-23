@@ -67,6 +67,33 @@ und mangels BCM5722 in QEMU ablehnen. Der CPU-Fix
 aus patcher9x betrifft nur die neu expandierte NDIS-Testdatei; die MIT-Lizenz
 liegt unter `LICENSES/`. Die Originalmedien werden nicht verändert.
 
+## Installation unter WfW 3.11
+
+`make disk` legt `BCM57DBG.386` und `OEMSETUP.INF` (Vorlage:
+[`inf/OEMSETUP.INF`](inf/OEMSETUP.INF)) in `build/disk/` ab. Diese Dateien
+auf eine Diskette oder in ein Verzeichnis kopieren, dann in WfW „Netzwerk“
+→ „Netzwerk-Setup“ → „Treiber“ → „Adapter hinzufügen“ → „Nicht aufgeführter
+oder aktualisierter Netzwerkadapter“ wählen und den Pfad angeben.
+
+Die INF folgt dem Aufbau von `NETWORK.INF` und der OEMSETUP.INF des
+SMC1211TX-Treibers. In `PROTOCOL.INI` werden folgende Einträge erwartet:
+
+```ini
+[BCM5722]
+DriverName=B57$
+
+[BCM57DBG]
+Adapters=BCM5722
+```
+
+`NDIS.386` liest beim Start `[BCM57DBG] Adapters=` und übergibt `BCM5722`
+an `AddAdapter`; unter diesem Namen binden die Protokolle. Der Smoke-Test
+prüft genau diese Zuordnung. Den Eintrag `DriverName` ignoriert der
+NDIS3-Treiber. `B57$` ist der Name von Broadcoms NDIS2-Treiber `B57.DOS`;
+mit `ndis2=7:b57.dos` in `[bcm5722]` und der Datei auf der Diskette lässt er
+sich als Real-Mode-Treiber ergänzen. Ob WfW-Setup die Abschnitte genau so
+schreibt, ist ohne Zielrechner noch nicht geprüft.
+
 ## Bestätigte Ausgangslage
 
 Der Nutzer bestätigt, dass der vorhandene Windows-98/ME-Treiber mit seiner

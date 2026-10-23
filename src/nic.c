@@ -222,6 +222,22 @@ static int map_card(void)
     return 1;
 }
 
+/* The section NDIS took from [BCM57DBG] Adapters= in PROTOCOL.INI, or the
+ * MAC name when that list is missing. Protocols bind to it. */
+static void log_name(const struct bcm_ndis_string *name)
+{
+    char text[33];
+    unsigned i;
+
+    for (i = 0; name && name->buffer && i < name->length && i < 32 &&
+                name->buffer[i]; ++i)
+        text[i] = name->buffer[i];
+    text[i] = 0;
+    bcm_log_text("BCM57DBG: AddAdapter name=");
+    bcm_log_text(text);
+    bcm_log_text("\r\n");
+}
+
 bcm_ndis_status bcm_nic_add(bcm_ndis_handle mac, bcm_ndis_handle configuration,
                             struct bcm_ndis_string *name)
 {
@@ -232,6 +248,7 @@ bcm_ndis_status bcm_nic_add(bcm_ndis_handle mac, bcm_ndis_handle configuration,
     uint8_t *p;
     unsigned i;
 
+    log_name(name);
     if (nic.registered) {
         bcm_log_text("BCM57DBG: AddAdapter: only one adapter is supported\r\n");
         return BCM_NDIS_FAILURE;

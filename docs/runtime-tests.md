@@ -71,9 +71,15 @@ BCM57DBG: VMM version raw=0000030b
 BCM57DBG: NdisGetVersion raw=00000300
 BCM57DBG: ResetTest=00000001
 BCM57DBG: BCM5722 14e4:165a not found
+BCM57DBG: AddAdapter name=BCM5722
 BCM57DBG: AddAdapter: BCM5722 not found
 BCM57DBG: NdisRegisterMac status=c0000001
 ```
+
+Die Testkopie enthält in `PROTOCOL.INI` die Abschnitte aus
+`inf/OEMSETUP.INF` (`[BCM5722] DriverName=B57$`, `[BCM57DBG]
+Adapters=BCM5722`). `AddAdapter name=BCM5722` belegt, dass NDIS die Liste
+gelesen hat; ohne sie stünde dort der MAC-Name `BCM57DBG`.
 
 `NdisInitializeWrapper` und `NdisRegisterMac` erreichen damit die echten WfW-
 NDIS-Dienste und den C-Callback. Die Diagnose läuft vor der Anmeldung, weil
@@ -108,7 +114,6 @@ auf realer Hardware noch nicht geprüft:
 - `AddAdapter` mit Hardwareinterrupts
 - der Paketbetrieb
 
-Für den Hardwaretest wird die Karte in `PROTOCOL.INI` an NetBEUI gebunden,
-voraussichtlich mit `DriverName=BCM57DBG$`. Das ist aus NE2000 abgeleitet: Es
-meldet den MAC-Namen „Ne2000“ an, die Testumgebung trägt `NE2000$` ein. Die
-Installation über eine `OEMSETUP.INF` folgt noch.
+Für den Hardwaretest wird die Karte über `inf/OEMSETUP.INF` installiert und
+in `PROTOCOL.INI` an NetBEUI gebunden (`Bindings=BCM5722`). Ob WfW-Setup die
+Abschnitte wie erwartet schreibt, ist noch zu prüfen.
