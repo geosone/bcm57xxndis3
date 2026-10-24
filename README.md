@@ -75,8 +75,11 @@ auf eine Diskette oder in ein Verzeichnis kopieren, dann in WfW „Netzwerk“
 → „Netzwerk-Setup“ → „Treiber“ → „Adapter hinzufügen“ → „Nicht aufgeführter
 oder aktualisierter Netzwerkadapter“ wählen und den Pfad angeben.
 
-Die INF folgt dem Aufbau von `NETWORK.INF` und der OEMSETUP.INF des
-SMC1211TX-Treibers. In `PROTOCOL.INI` werden folgende Einträge erwartet:
+Die INF folgt dem Aufbau von `NETWORK.INF` und den OEMSETUP.INF-Dateien der
+WfW-Treiber für SMC1211TX und Realtek RTL8129 (1998). Anders als diese
+deklariert sie in `[disks]` die eigene Diskette als Nummer 1. Mit dem dort
+üblichen `ndis3=7:` fragt Setup nach „WfW-Diskette 7“. In der deutschen WfW 3.11
+schreibt Setup folgende Einträge in `PROTOCOL.INI` (in QEMU geprüft):
 
 ```ini
 [BCM5722]
@@ -86,13 +89,16 @@ DriverName=B57$
 Adapters=BCM5722
 ```
 
+Dazu kommen `Bindings=BCM5722` für NetBEUI, IPX/SPX und NDISHLP und in der
+SYSTEM.INI `netcard=bcm57dbg.386`. Der Treiber landet in `C:\WINDOWS\SYSTEM`.
 `NDIS.386` liest beim Start `[BCM57DBG] Adapters=` und übergibt `BCM5722`
 an `AddAdapter`; unter diesem Namen binden die Protokolle. Der Smoke-Test
-prüft genau diese Zuordnung. Den Eintrag `DriverName` ignoriert der
+prüft diese Zuordnung auch ohne Setup. Den Eintrag `DriverName` ignoriert der
 NDIS3-Treiber. `B57$` ist der Name von Broadcoms NDIS2-Treiber `B57.DOS`;
-mit `ndis2=7:b57.dos` in `[bcm5722]` und der Datei auf der Diskette lässt er
-sich als Real-Mode-Treiber ergänzen. Ob WfW-Setup die Abschnitte genau so
-schreibt, ist ohne Zielrechner noch nicht geprüft.
+mit `ndis2=1:b57.dos` in `[bcm5722]` und der Datei auf der Diskette lässt er
+sich als Real-Mode-Treiber ergänzen. Setup hat `IFSHLP.SYS` nicht in die
+CONFIG.SYS eingetragen; `DEVICE=C:\WINDOWS\IFSHLP.SYS` bei Bedarf von Hand
+ergänzen.
 
 ## Bestätigte Ausgangslage
 

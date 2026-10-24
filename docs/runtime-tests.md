@@ -114,6 +114,30 @@ auf realer Hardware noch nicht geprüft:
 - `AddAdapter` mit Hardwareinterrupts
 - der Paketbetrieb
 
-Für den Hardwaretest wird die Karte über `inf/OEMSETUP.INF` installiert und
-in `PROTOCOL.INI` an NetBEUI gebunden (`Bindings=BCM5722`). Ob WfW-Setup die
-Abschnitte wie erwartet schreibt, ist noch zu prüfen.
+Für den Hardwaretest wird die Karte über `inf/OEMSETUP.INF` installiert.
+
+## Installation mit WfW-Setup (24.10.2026)
+
+In einer frischen Kopie des Testimages lief das deutsche „Netzwerk-Setup“
+(`WINSETUP.EXE /Z`) per QMP-Tastatureingaben und Bildschirmfotos:
+Microsoft Windows Network installieren, „Nicht aufgeführter oder
+aktualisierter Netzwerkadapter“, Pfad `C:\BCMDISK` mit `make disk`.
+
+- Setup zeigt „Broadcom NetXtreme BCM5722 Gigabit Ethernet“ an, bindet NetBEUI
+  und IPX/SPX und kopiert `BCM57DBG.386` ohne Nachfrage nach
+  `C:\WINDOWS\SYSTEM`. Mit `ndis3=7:` fragte es nach „WfW-Diskette 7“.
+- `PROTOCOL.INI`: `[BCM5722] DriverName=B57$`, `[BCM57DBG]
+  Adapters=BCM5722`, `BINDINGS=BCM5722` bei NetBEUI, NWLINK und MS$NDISHLP.
+- SYSTEM.INI: `netcard=bcm57dbg.386`, `netmisc=ndis.386,ndis2sup.386`.
+- `IFSHLP.SYS` fehlte in der CONFIG.SYS und wurde für den Start ergänzt,
+  ebenso die CPU-gepatchte `NDIS.386` aus der Testumgebung.
+
+Der Neustart dieser Installation lieferte:
+
+```text
+BCM57DBG: AddAdapter name=BCM5722
+BCM57DBG: AddAdapter: BCM5722 not found
+BCM57DBG: NdisRegisterMac status=c0000001
+```
+
+Die Kette INF → Setup → PROTOCOL.INI → `AddAdapter` ist damit geschlossen.

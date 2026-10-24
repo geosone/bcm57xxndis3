@@ -2,19 +2,25 @@
 ; Windows for Workgroups 3.11: Network Setup > Drivers > Add Adapter >
 ; "Unlisted or Updated Network Adapter", path to this disk.
 ;
-; Expected PROTOCOL.INI entries after Setup (the NDIS side is smoke-tested):
+; PROTOCOL.INI entries written by WfW 3.11 Setup (checked in QEMU):
 ;   [BCM5722]   DriverName=B57$       (adapter section, protocols bind to it)
 ;   [BCM57DBG]  Adapters=BCM5722      (NDIS.386 hands this name to AddAdapter)
 ;
 ; The NDIS3 driver ignores DriverName. B57$ is the name used by Broadcom's
 ; NDIS2 driver B57.DOS. To use it as the real-mode driver, put B57.DOS
-; on this disk and add "ndis2=7:b57.dos" to [bcm5722].
+; on this disk and add "ndis2=1:b57.dos" to [bcm5722].
+;
+; Disk 1 is this disk ([disks] below). Without it the number is a WfW disk
+; (SMC and Realtek ship "7:"), and Setup asks for "WfW disk 7" again.
 
 [netcard]
 bcm5722="Broadcom NetXtreme BCM5722 Gigabit Ethernet",000,ndis,ethernet,0x07,bcm5722,bcm5722_nif
 
 [bcm5722]
-ndis3=7:bcm57dbg.386
+ndis3=1:bcm57dbg.386
 
 [bcm5722_nif]
 drivername=B57$
+
+[disks]
+1 =. ,"Broadcom BCM5722 NDIS3 Disk",disk1
