@@ -1,4 +1,4 @@
-; IRQCLR.COM - take a request that is latched on a masked PCI IRQ (default 11)
+; IRQCLR.COM - take a request that is latched on the masked PCI IRQ 11
 ; once, so that a Windows driver that unmasks the line later does not start
 ; with it.  Prints what it found.
         org 100h

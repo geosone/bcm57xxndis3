@@ -2,8 +2,9 @@
 
 Ziel ist ein nativer NDIS-3.0-Netzwerktreiber im `.386`-Format für den
 Broadcom NetXtreme BCM5722 (`14e4:165a`). Der Repository-Name legt keine
-Chipfamilie fest. Der NDIS-Pfad ist vollständig implementiert, wurde aber
-bisher nur gegen Simulationen und ohne Karte unter WfW getestet.
+Chipfamilie fest. Der NDIS-Pfad ist vollständig implementiert und auf
+echter Hardware mit TCP/IP-32 geprüft (DHCP, Ping); Dauerlast und
+Dateitransfer sind noch offen.
 
 ## Build und Tests
 
@@ -69,8 +70,10 @@ liegt unter `LICENSES/`. Die Originalmedien werden nicht verändert.
 
 ## Installation unter WfW 3.11
 
-`make disk` legt `BCM57XX.386` und `OEMSETUP.INF` (Vorlage:
-[`inf/OEMSETUP.INF`](inf/OEMSETUP.INF)) in `build/disk/` ab. Diese Dateien
+`make disk` legt `BCM57XX.386`, `OEMSETUP.INF` (Vorlage:
+[`inf/OEMSETUP.INF`](inf/OEMSETUP.INF)) und die Hilfsprogramme `BCMLOG.EXE`
+(Protokoll des Treibers nach `C:\BCMLOG.TXT`) und `IRQCLR.COM` in
+`build/disk/` ab; dafür wird zusätzlich `nasm` gebraucht. Diese Dateien
 auf eine Diskette oder in ein Verzeichnis kopieren, dann in WfW „Netzwerk“
 → „Netzwerk-Setup“ → „Treiber“ → „Adapter hinzufügen“ → „Nicht aufgeführter
 oder aktualisierter Netzwerkadapter“ wählen und den Pfad angeben.
@@ -197,6 +200,19 @@ Netzwerkeinrichtung mit `OEMSETUP.INF`): Link 1000 Mbit/s Vollduplex,
 DHCP-Lease, Ping in beide Richtungen. Offen sind Dateitransfer, Dauerlast
 und wiederholtes Starten und Beenden von Windows.
 
+### Alte Anforderung auf IRQ 11 (ReBIOS)
+
+Auf dem Testrechner startet DOS unter dem Hypervisor ReBIOS. Dessen
+virtueller Interruptcontroller hält nach jedem Start eine Anforderung auf
+dem gesperrten IRQ 11 fest. Gibt der Treiber die Leitung frei, bleibt Windows
+am Startbild stehen. Abhilfe: `IRQCLR.COM` (liegt auf der Treiberdiskette,
+Quelle `tests/irqclr.asm`, fest für IRQ 11) in der `AUTOEXEC.BAT` vor `WIN`
+aufrufen; es nimmt die Anforderung unter DOS einmal an. Zwei Versuche, das im
+Treiber selbst zu erledigen (die ersten Interrupts vor dem Einschalten der
+Karte annehmen; die Anforderung vor `NdisInitializeInterrupt` per PIC-Poll
+abholen), haben auf dem Testrechner nicht geholfen. Auf Rechnern ohne dieses
+Verhalten ist `IRQCLR.COM` nicht nötig.
+
 ### Geteilte Interruptleitung
 
 Die Karte meldet ihren Interrupt als geteilt an. Hält ein anderes Gerät
@@ -208,7 +224,7 @@ ein Promise PDC20268, den AHCIASPI unter DOS nur abfragt; behoben ist es dort
 `tests/` (Bau mit `nasm -f bin -o NAME.COM tests/name.asm`):
 
 - `irqclr.asm`: gibt IRQ 11 kurz frei und zählt die Interrupts (höchstens
-  1000). Nimmt nebenbei eine einzelne alte Anforderung weg.
+  1000); siehe oben.
 - `irqsrc2.asm`: schaltet INTx bei allen PCI-Funktionen ab, liest zurück und
   zählt je Funktion; nennt die Funktionen, die INTx nicht abschalten.
 - `promq.asm`, `promk.asm`: Promise PDC20268 – Status lesen und nIEN setzen

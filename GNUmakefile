@@ -74,9 +74,13 @@ smoke: all $(OUT)/WFWEXIT.EXE
 	$(PYTHON) tools/smoke_wfw.py "$(WFW_IMAGE)" $(if $(NDIS_IMAGE),--ndis "$(NDIS_IMAGE)") $(if $(VNETSUP_IMAGE),--vnetsup "$(VNETSUP_IMAGE)") $(if $(IFSHLP_IMAGE),--ifshlp "$(IFSHLP_IMAGE)") $(if $(NETWORK_DIR),--network-dir "$(NETWORK_DIR)")
 
 # Contents of the WfW setup disk: driver and OEMSETUP.INF side by side.
-disk: all $(OUT)/BCMLOG.EXE
+disk: all $(OUT)/BCMLOG.EXE $(OUT)/IRQCLR.COM
 	mkdir -p $(OUT)/disk
-	cp $(OUT)/BCM57XX.386 $(OUT)/BCMLOG.EXE inf/OEMSETUP.INF $(OUT)/disk/
+	cp $(OUT)/BCM57XX.386 $(OUT)/BCMLOG.EXE $(OUT)/IRQCLR.COM inf/OEMSETUP.INF $(OUT)/disk/
+
+# DOS helper for machines that keep a request latched on IRQ 11 (see README).
+$(OUT)/IRQCLR.COM: tests/irqclr.asm | $(OUT)
+	nasm -f bin -o $@ $<
 
 $(OUT)/expand_kwaj: tools/expand_kwaj.c | $(OUT)
 	$(HOST_CC) -Wall -Wextra -Werror $< -lmspack -o $@
