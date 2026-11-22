@@ -36,7 +36,7 @@ static const char *const hw_results[] = {
 static void log_status(const char *text, uint32_t value)
 {
     if (text[0] != ' ')
-        bcm_log_text("BCM57DBG: ");
+        bcm_log_text("BCM57XX: ");
     bcm_log_text(text);
     bcm_log_hex(value);
     bcm_log_text("\r\n");
@@ -69,7 +69,7 @@ static enum bcm_hw_result bring_up(void)
     /* Without a working PHY the MAC still starts; link polling reports. */
     if (bcm5722_phy_reset(&nic.io) != BCM_PHY_OK ||
             bcm5722_phy_autoneg(&nic.io) != BCM_PHY_OK)
-        bcm_log_text("BCM57DBG: PHY setup failed\r\n");
+        bcm_log_text("BCM57XX: PHY setup failed\r\n");
     bcm_rings_init(&nic.rings);
     nic.rx_errors = 0;
     nic.modes.mac_mode = MAC_MODE_DEFAULT;
@@ -111,7 +111,7 @@ static int nic_reset(void *context)
     bcm5722_stop(&nic.io);
     result = bring_up();
     if (result != BCM_HW_OK) {
-        bcm_log_text("BCM57DBG: reset: ");
+        bcm_log_text("BCM57XX: reset: ");
         bcm_log_text(hw_results[result]);
         bcm_log_text("\r\n");
         return -1;
@@ -163,7 +163,7 @@ static void dpc(void *system1, void *context, void *system2, void *system3)
 
 static void log_link(void)
 {
-    bcm_log_text("BCM57DBG: link ");
+    bcm_log_text("BCM57XX: link ");
     if (!nic.link.up) {
         bcm_log_text("down\r\n");
         return;
@@ -203,11 +203,11 @@ static int map_card(void)
     const struct bcm_pci_device *card = &nic.card;
     if (bcm_platform_pci_read(0, card->bus, card->device, card->function,
                               0x4c) & 3) {
-        bcm_log_text("BCM57DBG: AddAdapter: device not in D0\r\n");
+        bcm_log_text("BCM57XX: AddAdapter: device not in D0\r\n");
         return 0;
     }
     if (!bcm_pci_mmio_base(card->bar0, card->bar1, &physical)) {
-        bcm_log_text("BCM57DBG: AddAdapter: unsupported or unassigned BAR0\r\n");
+        bcm_log_text("BCM57XX: AddAdapter: unsupported or unassigned BAR0\r\n");
         return 0;
     }
     nic.platform.bus = card->bus;
@@ -215,14 +215,14 @@ static int map_card(void)
     nic.platform.function = card->function;
     nic.platform.mmio = bcm_map_mmio(physical);
     if (!nic.platform.mmio || (uint32_t)nic.platform.mmio == 0xffffffffUL) {
-        bcm_log_text("BCM57DBG: AddAdapter: MMIO mapping failed\r\n");
+        bcm_log_text("BCM57XX: AddAdapter: MMIO mapping failed\r\n");
         return 0;
     }
     bcm_platform_io(&nic.platform, &nic.io);
     return 1;
 }
 
-/* The section NDIS took from [BCM57DBG] Adapters= in PROTOCOL.INI, or the
+/* The section NDIS took from [BCM57XX] Adapters= in PROTOCOL.INI, or the
  * MAC name when that list is missing. Protocols bind to it. */
 static void log_name(const struct bcm_ndis_string *name)
 {
@@ -233,7 +233,7 @@ static void log_name(const struct bcm_ndis_string *name)
                 name->buffer[i]; ++i)
         text[i] = name->buffer[i];
     text[i] = 0;
-    bcm_log_text("BCM57DBG: AddAdapter name=");
+    bcm_log_text("BCM57XX: AddAdapter name=");
     bcm_log_text(text);
     bcm_log_text("\r\n");
 }
@@ -250,11 +250,11 @@ bcm_ndis_status bcm_nic_add(bcm_ndis_handle mac, bcm_ndis_handle configuration,
 
     log_name(name);
     if (nic.registered) {
-        bcm_log_text("BCM57DBG: AddAdapter: only one adapter is supported\r\n");
+        bcm_log_text("BCM57XX: AddAdapter: only one adapter is supported\r\n");
         return BCM_NDIS_FAILURE;
     }
     if (!bcm_find_5722(bcm_platform_pci_read, 0, &nic.card)) {
-        bcm_log_text("BCM57DBG: AddAdapter: BCM5722 not found\r\n");
+        bcm_log_text("BCM57XX: AddAdapter: BCM5722 not found\r\n");
         return BCM_NDIS_ADAPTER_NOT_FOUND;
     }
     if (!nic.card.irq || nic.card.irq > 15) {
@@ -267,13 +267,13 @@ bcm_ndis_status bcm_nic_add(bcm_ndis_handle mac, bcm_ndis_handle configuration,
     if ((command & 6) != 6)             /* memory decode, bus master */
         nic.io.pci_write16(nic.io.context, 4, (uint16_t)(command | 6));
     if (bcm_platform_dma_alloc(&nic.rings)) {
-        bcm_log_text("BCM57DBG: AddAdapter: no DMA memory\r\n");
+        bcm_log_text("BCM57XX: AddAdapter: no DMA memory\r\n");
         return BCM_NDIS_RESOURCES;
     }
     nic.adapter.promiscuous = 0;
     result = bring_up();
     if (result != BCM_HW_OK) {
-        bcm_log_text("BCM57DBG: AddAdapter: ");
+        bcm_log_text("BCM57XX: AddAdapter: ");
         bcm_log_text(hw_results[result]);
         bcm_log_text("\r\n");
         bcm_platform_dma_free();
@@ -315,7 +315,7 @@ bcm_ndis_status bcm_nic_add(bcm_ndis_handle mac, bcm_ndis_handle configuration,
     nic.link_event.function = link_poll;
     bcm_ndis_set_timer(&nic.link_timer, LINK_POLL_MS);
 
-    bcm_log_text("BCM57DBG: adapter ready, MAC-high=");
+    bcm_log_text("BCM57XX: adapter ready, MAC-high=");
     bcm_log_hex((uint32_t)nic.mac[0] << 8 | nic.mac[1]);
     bcm_log_text(" MAC-low=");
     bcm_log_hex((uint32_t)nic.mac[2] << 24 | (uint32_t)nic.mac[3] << 16 |

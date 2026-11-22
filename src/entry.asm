@@ -326,7 +326,7 @@ bcm_pit_count proc
     ret
 bcm_pit_count endp
 
-; int bcm_profile_int(const char *key, int default): [BCM57DBG] in SYSTEM.INI
+; int bcm_profile_int(const char *key, int default): [BCM57XX] in SYSTEM.INI
 bcm_profile_int proc key:dword, def:dword
     push ebx
     push ecx
@@ -472,7 +472,7 @@ bcm_lin_to_phys proc linear:dword
     ret
 bcm_lin_to_phys endp
 
-profile_section db "BCM57DBG", 0
+profile_section db "BCM57XX", 0
 
 ; Emulator debug console, and a memory log for real hardware: the protected
 ; mode API (device ID 3A57h) returns it to a Windows program byte by byte.
@@ -510,15 +510,15 @@ log_length dd 0
 log_text db LOG_SIZE dup (0)
     .code
 
-    public BCM57DBG_DDB
+    public BCM57XX_DDB
     align 4
-BCM57DBG_DDB label byte
+BCM57XX_DDB label byte
     dd 0                        ; next DDB
     dw 030ah                    ; Windows 3.1 DDK interface version
     dw 3a57h                    ; device ID for the log API (not assigned by Microsoft)
-    db 0, 1                     ; diagnostic version 0.1
+    db 0, 1                     ; version 0.1
     dw 0
-    db "BCM57DBG"
+    db "BCM57XX "
     dd 54004000h                ; WfW MAC_Init_Order, after NDIS 54002000h
     dd offset control_proc
     dd 0                        ; no V86 API

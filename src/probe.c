@@ -1,5 +1,5 @@
 /* Ring-0 preflight, then the MAC registration. The probe itself only reads
- * the card, unless [BCM57DBG] ResetTest=1 in SYSTEM.INI asks for one reset
+ * the card, unless [BCM57XX] ResetTest=1 in SYSTEM.INI asks for one reset
  * (and PHY setup); ResetTest=2 adds a DMA loopback test. */
 #include "pci.h"
 #include "ndis3.h"
@@ -33,7 +33,7 @@ static const char *const reset_results[] = {
 
 static void log_phy(const char *step, enum bcm_phy_result result)
 {
-    bcm_log_text("BCM57DBG: ResetTest: PHY ");
+    bcm_log_text("BCM57XX: ResetTest: PHY ");
     bcm_log_text(step);
     bcm_log_text(result == BCM_PHY_OK ? " ok\r\n" :
                  result == BCM_PHY_BUSY ? " MI busy\r\n" : " reset timeout\r\n");
@@ -56,7 +56,7 @@ static void phy_test(const struct bcm_hw_io *io, int dma)
     log_phy("ID", result);
     if (result != BCM_PHY_OK)
         return;
-    bcm_log_text("BCM57DBG: ResetTest: PHY ID=");
+    bcm_log_text("BCM57XX: ResetTest: PHY ID=");
     bcm_log_hex(id);
     bcm_log_text("\r\n");
     if ((result = bcm5722_phy_reset(io)) != BCM_PHY_OK) {
@@ -76,7 +76,7 @@ static void phy_test(const struct bcm_hw_io *io, int dma)
             break;
         bcm_platform_delay_us(100000);
     }
-    bcm_log_text("BCM57DBG: ResetTest: link ");
+    bcm_log_text("BCM57XX: ResetTest: link ");
     if (!link.up) {
         bcm_log_text("down after 5 s\r\n");
         if (dma)
@@ -120,7 +120,7 @@ static void dma_test(const struct bcm_hw_io *io, struct bcm_mac_modes *modes)
     unsigned i, sent = 0, completed = 0, stuck;
 
     if (bcm_platform_dma_alloc(&rings)) {
-        bcm_log_text("BCM57DBG: DMA test: no DMA memory\r\n");
+        bcm_log_text("BCM57XX: DMA test: no DMA memory\r\n");
         return;
     }
     bcm_rings_init(&rings);
@@ -130,14 +130,14 @@ static void dma_test(const struct bcm_hw_io *io, struct bcm_mac_modes *modes)
     addresses.status = rings.block_phys + BCM_RING_STATUS_OFFSET;
     addresses.std_posted = rings.rx_producer;
     bcm5722_read_mac(io, mac);
-    bcm_log_text("BCM57DBG: DMA test: rings phys=");
+    bcm_log_text("BCM57XX: DMA test: rings phys=");
     bcm_log_hex(rings.block_phys);
     bcm_log_text("\r\n");
     /* TDE/RDE/FHDE, statistics, internal loopback (MAC_MODE bit 4). */
     result = bcm5722_start(io, &addresses, mac,
         modes->mac_mode | 0x00e04810UL, 0x01000002UL, 0x102);
     if (result != BCM_HW_OK) {
-        bcm_log_text("BCM57DBG: DMA test: ");
+        bcm_log_text("BCM57XX: DMA test: ");
         bcm_log_text(reset_results[result]);
         bcm_log_text("\r\n");
         bcm_platform_dma_free();
@@ -169,14 +169,14 @@ static void dma_test(const struct bcm_hw_io *io, struct bcm_mac_modes *modes)
             0x4c04, 0x6800, 0x6804, 0x6808, 0x2450, 0x2454, 0x2458, 0x245c
         };
         const volatile uint32_t *block = (const volatile uint32_t *)rings.status;
-        bcm_log_text("BCM57DBG: DMA test: registers");
+        bcm_log_text("BCM57XX: DMA test: registers");
         for (i = 0; i < sizeof(registers) / sizeof(registers[0]); ++i) {
             bcm_log_text(i % 4 ? " " : "\r\n  ");
             bcm_log_hex(registers[i]);
             bcm_log_text("=");
             bcm_log_hex(io->read32(io->context, registers[i]));
         }
-        bcm_log_text("\r\nBCM57DBG: DMA test: send RCB");
+        bcm_log_text("\r\nBCM57XX: DMA test: send RCB");
         for (i = 0; i < 4; ++i) {
             bcm_log_text(" ");
             bcm_log_hex(bcm5722_memory_read(io, 0x100 + 4 * i));
@@ -186,7 +186,7 @@ static void dma_test(const struct bcm_hw_io *io, struct bcm_mac_modes *modes)
             bcm_log_text(" ");
             bcm_log_hex(bcm5722_memory_read(io, 0x200 + 4 * i));
         }
-        bcm_log_text("\r\nBCM57DBG: DMA test: status block");
+        bcm_log_text("\r\nBCM57XX: DMA test: status block");
         for (i = 0; i < 5; ++i) {
             bcm_log_text(" ");
             bcm_log_hex(block[i]);
@@ -199,7 +199,7 @@ static void dma_test(const struct bcm_hw_io *io, struct bcm_mac_modes *modes)
         bcm_log_text("\r\n");
     }
     stuck = bcm5722_stop(io);
-    bcm_log_text("BCM57DBG: DMA test: sent=");
+    bcm_log_text("BCM57XX: DMA test: sent=");
     bcm_log_hex(sent);
     bcm_log_text(" completed=");
     bcm_log_hex(completed);
@@ -234,14 +234,14 @@ static void reset_test(const struct bcm_pci_device *card,
     command = io.pci_read16(io.context, 4);
     if ((command & 6) != 6) {
         io.pci_write16(io.context, 4, (uint16_t)(command | 6));
-        bcm_log_text("BCM57DBG: ResetTest: PCI command ");
+        bcm_log_text("BCM57XX: ResetTest: PCI command ");
         bcm_log_hex(command);
         bcm_log_text(" -> ");
         bcm_log_hex(io.pci_read16(io.context, 4));
         bcm_log_text("\r\n");
     }
     result = bcm5722_reset(&io);
-    bcm_log_text("BCM57DBG: ResetTest: ");
+    bcm_log_text("BCM57XX: ResetTest: ");
     bcm_log_text(result <= BCM_HW_BUFFER_MANAGER_TIMEOUT ?
                  reset_results[result] : "?");
     bcm_log_text(" host-control=");
@@ -263,10 +263,10 @@ static void probe_card(int reset)
     volatile uint32_t *mmio;
 
     if (!bcm_find_5722(bcm_platform_pci_read, 0, &card)) {
-        bcm_log_text("BCM57DBG: BCM5722 14e4:165a not found\r\n");
+        bcm_log_text("BCM57XX: BCM5722 14e4:165a not found\r\n");
         return;
     }
-    bcm_log_text("BCM57DBG: BDF=");
+    bcm_log_text("BCM57XX: BDF=");
     bcm_log_hex((card.bus << 8) | (card.device << 3) | card.function);
     bcm_log_text(" class/revision=");
     bcm_log_hex(card.class_revision);
@@ -284,25 +284,25 @@ static void probe_card(int reset)
     bcm_log_hex(card.command_status);
     bcm_log_text("\r\n");
     pci_host = bcm_platform_pci_read(0, card.bus, card.device, card.function, 0x68);
-    bcm_log_text("BCM57DBG: PCI host-control/ASIC=");
+    bcm_log_text("BCM57XX: PCI host-control/ASIC=");
     bcm_log_hex(pci_host);
     bcm_log_text("\r\n");
     if (!(card.command_status & 2) ||
             (bcm_platform_pci_read(0, card.bus, card.device, card.function, 0x4c) & 3)) {
-        bcm_log_text("BCM57DBG: MMIO skipped: memory decode disabled or device not in D0\r\n");
+        bcm_log_text("BCM57XX: MMIO skipped: memory decode disabled or device not in D0\r\n");
         return;
     }
     if (!bcm_pci_mmio_base(card.bar0, card.bar1, &physical)) {
-        bcm_log_text("BCM57DBG: MMIO skipped: unsupported/unassigned BAR0\r\n");
+        bcm_log_text("BCM57XX: MMIO skipped: unsupported/unassigned BAR0\r\n");
         return;
     }
     mmio = bcm_map_mmio(physical);
     if (!mmio || (uint32_t)mmio == 0xffffffffUL) {
-        bcm_log_text("BCM57DBG: MMIO mapping failed\r\n");
+        bcm_log_text("BCM57XX: MMIO mapping failed\r\n");
         return;
     }
     mmio_host = mmio[0x68 / 4];
-    bcm_log_text("BCM57DBG: MMIO host-control/ASIC=");
+    bcm_log_text("BCM57XX: MMIO host-control/ASIC=");
     bcm_log_hex(mmio_host);
     if ((mmio_host & 0xffff0000UL) != (pci_host & 0xffff0000UL) ||
             mmio_host == 0xffffffffUL) {
@@ -317,7 +317,7 @@ static void probe_card(int reset)
     bcm_log_hex(mmio[0x6800 / 4]);
     bcm_log_text("\r\n");
     if (!reset) {
-        bcm_log_text("BCM57DBG: probe complete; NIC configuration unchanged\r\n");
+        bcm_log_text("BCM57XX: probe complete; NIC configuration unchanged\r\n");
         return;
     }
     reset_test(&card, mmio, reset >= 2);
@@ -331,22 +331,22 @@ void bcm_probe_init(void)
     bcm_ndis_status status;
     int reset;
 
-    bcm_log_text("BCM57DBG: init\r\n");
-    bcm_log_text("BCM57DBG: VMM version raw=");
+    bcm_log_text("BCM57XX: init\r\n");
+    bcm_log_text("BCM57XX: VMM version raw=");
     bcm_log_hex(bcm_vmm_version());
     bcm_log_text("\r\n");
     version = bcm_ndis_version();
-    bcm_log_text("BCM57DBG: NdisGetVersion raw=");
+    bcm_log_text("BCM57XX: NdisGetVersion raw=");
     bcm_log_hex(version);
     bcm_log_text(version ? "\r\n" : " (unavailable or zero)\r\n");
     reset = bcm_profile_int("ResetTest", 0);
-    bcm_log_text("BCM57DBG: ResetTest=");
+    bcm_log_text("BCM57XX: ResetTest=");
     bcm_log_hex((uint32_t)reset);
     bcm_log_text("\r\n");
     probe_card(reset);
     if (version) {
         status = bcm_mac_start();
-        bcm_log_text("BCM57DBG: NdisRegisterMac status=");
+        bcm_log_text("BCM57XX: NdisRegisterMac status=");
         bcm_log_hex(status);
         bcm_log_text("\r\n");
     }

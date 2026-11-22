@@ -81,7 +81,7 @@ def inspect(path, prepare=False):
     ddb_object = u16(entry + 2)
     ddb_offset = u32(entry + 5)
     ddb = object_file_offset(ddb_object, ddb_offset, 56)
-    if data[ddb + 12:ddb + 20] != b"BCM57DBG":
+    if data[ddb + 12:ddb + 20] != b"BCM57XX ":
         raise ValueError("wrong DDB name")
     if u16(ddb + 4) != 0x030a or u16(ddb + 6) != 0x3a57:
         raise ValueError("wrong DDB version or device ID")
@@ -99,7 +99,7 @@ def inspect(path, prepare=False):
         raise ValueError("NdisGetVersion VxD call is missing")
     if prepare:
         path.write_bytes(data)
-    print(f"{path}: valid BCM57DBG LE/DDB, {count} locked 32-bit objects")
+    print(f"{path}: valid BCM57XX LE/DDB, {count} locked 32-bit objects")
 
 
 def main():

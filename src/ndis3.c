@@ -4,7 +4,7 @@
 
 static bcm_ndis_handle wrapper_handle;
 static bcm_ndis_handle mac_handle;
-static char mac_name[] = "BCM57DBG";
+static char mac_name[] = "BCM57XX";
 /* No EISA or MCA IDs; PCI discovery is handled by our hardware layer. */
 static uint16_t adapter_ids[2];
 
@@ -106,7 +106,7 @@ void bcm_mac_stop(void)
     if (mac_handle) {
         bcm_ndis_deregister(&status, mac_handle);
         if (status != BCM_NDIS_SUCCESS) {
-            bcm_log_text("BCM57DBG: NdisDeregisterMac failed: ");
+            bcm_log_text("BCM57XX: NdisDeregisterMac failed: ");
             bcm_log_hex(status);
             bcm_log_text("\r\n");
             return; /* Keep the wrapper while NDIS still references this MAC. */

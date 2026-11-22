@@ -1,6 +1,6 @@
 # Diagnosebuild: Prüfstand
 
-Stand: 24. Oktober 2026. Artefakt: `build/BCM57DBG.386`.
+Stand: 24. Oktober 2026. Artefakt: `build/BCM57XX.386`.
 Der Build enthält den vollständigen NDIS-Pfad. Ohne Karte lehnt `AddAdapter`
 ab; auf echter Hardware ist der Paketbetrieb noch nicht geprüft.
 
@@ -66,20 +66,20 @@ Die Originalmedien bleiben unverändert.
 Nachgewiesener Ablauf:
 
 ```text
-BCM57DBG: init
-BCM57DBG: VMM version raw=0000030b
-BCM57DBG: NdisGetVersion raw=00000300
-BCM57DBG: ResetTest=00000001
-BCM57DBG: BCM5722 14e4:165a not found
-BCM57DBG: AddAdapter name=BCM5722
-BCM57DBG: AddAdapter: BCM5722 not found
-BCM57DBG: NdisRegisterMac status=c0000001
+BCM57XX: init
+BCM57XX: VMM version raw=0000030b
+BCM57XX: NdisGetVersion raw=00000300
+BCM57XX: ResetTest=00000001
+BCM57XX: BCM5722 14e4:165a not found
+BCM57XX: AddAdapter name=BCM5722
+BCM57XX: AddAdapter: BCM5722 not found
+BCM57XX: NdisRegisterMac status=c0000001
 ```
 
 Die Testkopie enthält in `PROTOCOL.INI` die Abschnitte aus
-`inf/OEMSETUP.INF` (`[BCM5722] DriverName=B57$`, `[BCM57DBG]
+`inf/OEMSETUP.INF` (`[BCM5722] DriverName=B57$`, `[BCM57XX]
 Adapters=BCM5722`). `AddAdapter name=BCM5722` belegt, dass NDIS die Liste
-gelesen hat; ohne sie stünde dort der MAC-Name `BCM57DBG`.
+gelesen hat; ohne sie stünde dort der MAC-Name `BCM57XX`.
 
 `NdisInitializeWrapper` und `NdisRegisterMac` erreichen damit die echten WfW-
 NDIS-Dienste und den C-Callback. Die Diagnose läuft vor der Anmeldung, weil
@@ -99,8 +99,8 @@ Host-Offsettests verhindern ein Zurückfallen auf das falsche 56-Byte-Layout.
 
 ## SYSTEM.INI-Schalter
 
-Der Smoke-Test trägt `[BCM57DBG] ResetTest=1` ein und erwartet
-`BCM57DBG: ResetTest=00000001` im Protokoll. Das belegt den VMM-Dienst
+Der Smoke-Test trägt `[BCM57XX] ResetTest=1` ein und erwartet
+`BCM57XX: ResetTest=00000001` im Protokoll. Das belegt den VMM-Dienst
 `Get_Profile_Decimal_Int`. Ohne BCM5722 erreicht der Lauf den Resetpfad nicht.
 
 ## Ausstehend
@@ -124,20 +124,20 @@ Microsoft Windows Network installieren, „Nicht aufgeführter oder
 aktualisierter Netzwerkadapter“, Pfad `C:\BCMDISK` mit `make disk`.
 
 - Setup zeigt „Broadcom NetXtreme BCM5722 Gigabit Ethernet“ an, bindet NetBEUI
-  und IPX/SPX und kopiert `BCM57DBG.386` ohne Nachfrage nach
+  und IPX/SPX und kopiert `BCM57XX.386` ohne Nachfrage nach
   `C:\WINDOWS\SYSTEM`. Mit `ndis3=7:` fragte es nach „WfW-Diskette 7“.
-- `PROTOCOL.INI`: `[BCM5722] DriverName=B57$`, `[BCM57DBG]
+- `PROTOCOL.INI`: `[BCM5722] DriverName=B57$`, `[BCM57XX]
   Adapters=BCM5722`, `BINDINGS=BCM5722` bei NetBEUI, NWLINK und MS$NDISHLP.
-- SYSTEM.INI: `netcard=bcm57dbg.386`, `netmisc=ndis.386,ndis2sup.386`.
+- SYSTEM.INI: `netcard=bcm57xx.386`, `netmisc=ndis.386,ndis2sup.386`.
 - `IFSHLP.SYS` fehlte in der CONFIG.SYS und wurde für den Start ergänzt,
   ebenso die CPU-gepatchte `NDIS.386` aus der Testumgebung.
 
 Der Neustart dieser Installation lieferte:
 
 ```text
-BCM57DBG: AddAdapter name=BCM5722
-BCM57DBG: AddAdapter: BCM5722 not found
-BCM57DBG: NdisRegisterMac status=c0000001
+BCM57XX: AddAdapter name=BCM5722
+BCM57XX: AddAdapter: BCM5722 not found
+BCM57XX: NdisRegisterMac status=c0000001
 ```
 
 Die Kette INF → Setup → PROTOCOL.INI → `AddAdapter` ist damit geschlossen.

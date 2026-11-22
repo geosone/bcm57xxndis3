@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-r"""Boot an isolated copy of an installed DOS/WfW image with BCM57DBG.
+r"""Boot an isolated copy of an installed DOS/WfW image with BCM57XX.
 
 Requires a bootable raw image, FAT partition at --partition-offset, Windows in
 C:\WINDOWS, mtools and QEMU. Optional --ndis must be an expanded WfW NDIS.386.
@@ -85,15 +85,23 @@ def main():
                     "LANABASE=0\n"
                     # As inf/OEMSETUP.INF: NDIS.386 passes BCM5722 to AddAdapter.
                     "[BCM5722]\nDriverName=B57$\n"
-                    "[BCM57DBG]\nAdapters=BCM5722\n")
+                    "[BCM57XX]\nAdapters=BCM5722\n")
         (work / "PROTOCOL.INI").write_bytes(protocol.replace("\n", "\r\n").encode())
         mcopy(work / "PROTOCOL.INI", "::/WINDOWS/PROTOCOL.INI")
     # Exercises Get_Profile_Decimal_Int; without a BCM5722 nothing is reset.
-    text = set_values(text, "BCM57DBG", {"ResetTest": "1"})
+    text = set_values(text, "BCM57XX", {"ResetTest": "1"})
     lines = text.splitlines()
     index = next(i for i, line in enumerate(lines)
                  if line.strip().lower() == "[386enh]")
-    additions = ["device=C:\\BCM57DBG.386"]
+    import os
+    # BCM_NETCARD=1: load the driver as WfW Setup enters it (netcard=).
+    if os.environ.get("BCM_NETCARD"):
+        additions = []
+        for i, line in enumerate(lines):
+            if line.lower().startswith("netcard=") and i > index and ".386" in line.lower():
+                lines[i] = line + ",C:\\BCM57XX.386"
+    else:
+        additions = ["device=C:\\BCM57XX.386"]
     if args.ndis and not args.network_dir:
         additions.insert(0, "device=C:\\NDIS.386")
         additions.append("AlwaysLoadNdisWrapper=1")
@@ -112,7 +120,7 @@ def main():
     (work / "SYSTEM.INI").write_bytes(
         ("\r\n".join(lines) + "\r\n").encode("cp1252"))
     mcopy(work / "SYSTEM.INI", "::/WINDOWS/SYSTEM.INI")
-    mcopy(repo / "build/BCM57DBG.386", "::/BCM57DBG.386")
+    mcopy(repo / "build/BCM57XX.386", "::/BCM57XX.386")
     mcopy(repo / "build/WFWEXIT.EXE", "::/WFWEXIT.EXE")
     # OUT F4h exits only the isolated QEMU with isa-debug-exit configured.
     (work / "QEXIT.COM").write_bytes(bytes.fromhex("baf400b000eecd20"))
@@ -122,7 +130,11 @@ def main():
     (work / "AUTOEXEC.BAT").write_bytes(
         b"@ECHO OFF\r\nPATH C:\\;C:\\WINDOWS\r\n"
         b"DEL C:\\BCMDONE.TXT >NUL\r\n" + network_start +
+        (b"C:\\WINDOWS\\WIN /b C:\\BCMLOG.EXE x\r\n" if os.environ.get("BCM_LOGTEST")
+         else b"") +
         b"C:\\WINDOWS\\WIN /b C:\\WFWEXIT.EXE\r\nC:\\QEXIT.COM\r\n")
+    if os.environ.get("BCM_LOGTEST"):
+        mcopy(repo / "build/disk/BCMLOG.EXE", "::/BCMLOG.EXE")
     mcopy(work / "AUTOEXEC.BAT", "::/AUTOEXEC.BAT")
     command = ["qemu-system-i386", "-machine", "pc", "-accel", "tcg",
                "-cpu", "486", "-m", "32", "-display", "none",
@@ -151,8 +163,8 @@ def main():
     marker = subprocess.run(["mtype", "-i", fat, "::/BCMDONE.TXT"],
                             capture_output=True)
     if (result.returncode != 1 or marker.returncode != 0 or
-            "BCM57DBG: BCM5722 14e4:165a not found" not in log or
-            "BCM57DBG: ResetTest=00000001" not in log):
+            "BCM57XX: BCM5722 14e4:165a not found" not in log or
+            "BCM57XX: ResetTest=00000001" not in log):
         parser.exit(1, f"WfW smoke test failed; inspect {work}\n")
     if (args.ndis or args.network_dir) and "raw=00000000" in log:
         parser.exit(1, "NDIS version query failed\n")

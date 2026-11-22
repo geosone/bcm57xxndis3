@@ -103,7 +103,7 @@ seinen zusammenhängenden RX-Ring (0x4650 Byte) und seine TX-Puffer.
 - DMA-Speicher beziehen sie über `NdisAllocateSharedMemory`.
 - Zur Wahl unter mehreren Karten lesen sie `BusNo`/`DeviceNo` aus `PROTOCOL.INI`.
 
-## Folgerungen für BCM57DBG
+## Folgerungen für BCM57XX
 
 - `AdapterType=1`, 0 Ports (MMIO), Shared-Interrupt mit IRQ-Leitung aus dem
   PCI-Konfigurationsraum.
@@ -114,7 +114,7 @@ seinen zusammenhängenden RX-Ring (0x4650 Byte) und seine TX-Puffer.
   der Statusblock ein neues Tag hat oder INTA aktiv ist.
 - Loopback und Link-Abfrage laufen über 0-ms-Timer, also als Events. Ein
   1-s-Time-out stößt nur die Link-Abfrage an.
-- Der MAC-Name `BCM57DBG` wird mit Length=MaximumLength=9 angemeldet;
-  `PROTOCOL.INI` erhält `[BCM57DBG] Adapters=BCM5722` (siehe `inf/OEMSETUP.INF`).
+- Der MAC-Name `BCM57XX` wird mit Length=MaximumLength=8 angemeldet;
+  `PROTOCOL.INI` erhält `[BCM57XX] Adapters=BCM5722` (siehe `inf/OEMSETUP.INF`).
 - WfW hat keine Ethernet-Filterbibliothek; Paketfilter und Multicast-Listen
   pro Binding verwaltet `src/adapter.c`.

@@ -7,7 +7,7 @@ bisher nur gegen Simulationen und ohne Karte unter WfW getestet.
 
 ## Build und Tests
 
-Der Build erzeugt `build/BCM57DBG.386`. Beim Start protokolliert er
+Der Build erzeugt `build/BCM57XX.386`. Beim Start protokolliert er
 VMM- und NDIS-Versionen und sucht den BCM5722 über
 PCI-Konfigurationsmechanismus 1. Danach meldet er sich als NDIS-3.0-MAC an.
 `AddAdapter` setzt die Karte zurück, richtet PHY, DMA-Ringe und den geteilten
@@ -69,7 +69,7 @@ liegt unter `LICENSES/`. Die Originalmedien werden nicht verändert.
 
 ## Installation unter WfW 3.11
 
-`make disk` legt `BCM57DBG.386` und `OEMSETUP.INF` (Vorlage:
+`make disk` legt `BCM57XX.386` und `OEMSETUP.INF` (Vorlage:
 [`inf/OEMSETUP.INF`](inf/OEMSETUP.INF)) in `build/disk/` ab. Diese Dateien
 auf eine Diskette oder in ein Verzeichnis kopieren, dann in WfW „Netzwerk“
 → „Netzwerk-Setup“ → „Treiber“ → „Adapter hinzufügen“ → „Nicht aufgeführter
@@ -85,13 +85,13 @@ schreibt Setup folgende Einträge in `PROTOCOL.INI` (in QEMU geprüft):
 [BCM5722]
 DriverName=B57$
 
-[BCM57DBG]
+[BCM57XX]
 Adapters=BCM5722
 ```
 
 Dazu kommen `Bindings=BCM5722` für NetBEUI, IPX/SPX und NDISHLP und in der
-SYSTEM.INI `netcard=bcm57dbg.386`. Der Treiber landet in `C:\WINDOWS\SYSTEM`.
-`NDIS.386` liest beim Start `[BCM57DBG] Adapters=` und übergibt `BCM5722`
+SYSTEM.INI `netcard=bcm57xx.386`. Der Treiber landet in `C:\WINDOWS\SYSTEM`.
+`NDIS.386` liest beim Start `[BCM57XX] Adapters=` und übergibt `BCM5722`
 an `AddAdapter`; unter diesem Namen binden die Protokolle. Der Smoke-Test
 prüft diese Zuordnung auch ohne Setup. Den Eintrag `DriverName` ignoriert der
 NDIS3-Treiber. `B57$` ist der Name von Broadcoms NDIS2-Treiber `B57.DOS`;
@@ -186,15 +186,34 @@ Hosttests und der WfW-Lauf ohne Karte bestehen; Details stehen in
 
 Der Resetpfad und Deskriptorlayouts wurden aus dem vom Nutzer genannten
 [`chris1111/BCM5722D`](https://github.com/chris1111/BCM5722D) nach C portiert.
-Mit `[BCM57DBG] ResetTest=1` (oder `=2` mit DMA-Loopback) in der SYSTEM.INI
+Mit `[BCM57XX] ResetTest=1` (oder `=2` mit DMA-Loopback) in der SYSTEM.INI
 läuft vor der Anmeldung zusätzlich die Diagnose. Herkunft und Lizenz:
 [`docs/hardware-port.md`](docs/hardware-port.md), GPL-2.0-or-later für die
 adaptierten Hardwareteile, Lizenztext in `COPYING`.
 
-Als Nächstes folgen der Test auf echter Hardware (Link, ARP, Ping,
-Dateitransfer, wiederholtes Starten und Beenden von Windows) und eine
-`OEMSETUP.INF` für die WfW-Netzwerkeinrichtung. Die geplante Proxmox-VM mit
-durchgereichtem BCM5722 ist noch nicht verfügbar.
+Auf echter Hardware geprüft am 22. November 2026 (ASUS Z370-G, BCM5722
+`14e4:165a`, WfW 3.11 mit Microsoft TCP/IP-32, eingerichtet über die
+Netzwerkeinrichtung mit `OEMSETUP.INF`): Link 1000 Mbit/s Vollduplex,
+DHCP-Lease, Ping in beide Richtungen. Offen sind Dateitransfer, Dauerlast
+und wiederholtes Starten und Beenden von Windows.
+
+### Geteilte Interruptleitung
+
+Die Karte meldet ihren Interrupt als geteilt an. Hält ein anderes Gerät
+dieselbe PCI-Leitung fest, ruft Windows den Treiber ohne Ende auf, sobald er
+den IRQ freigibt: Der Start bleibt in `NdisInitializeInterrupt` stehen oder
+der Rechner friert mit dem ersten Verkehr ein. Auf dem Testrechner war das
+ein Promise PDC20268, den AHCIASPI unter DOS nur abfragt; behoben ist es dort
+(AHCIASPI ab Commit `6783a17`). Zum Eingrenzen liegen DOS-Programme in
+`tests/` (Bau mit `nasm -f bin -o NAME.COM tests/name.asm`):
+
+- `irqclr.asm`: gibt IRQ 11 kurz frei und zählt die Interrupts (höchstens
+  1000). Nimmt nebenbei eine einzelne alte Anforderung weg.
+- `irqsrc2.asm`: schaltet INTx bei allen PCI-Funktionen ab, liest zurück und
+  zählt je Funktion; nennt die Funktionen, die INTx nicht abschalten.
+- `promq.asm`, `promk.asm`: Promise PDC20268 – Status lesen und nIEN setzen
+  bzw. je Kanal einen Laufwerksinterrupt auslösen und quittieren.
+- `smbq.asm`: Interruptquellen des Intel-SMBus-Controllers zeigen und löschen.
 
 Die maßgebliche Hardwarebeschreibung ist
 [`5722-PG101-R` vom 15.10.2007](https://www.manualslib.com/manual/3455622/Broadcom-Bcm5722.html).

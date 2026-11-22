@@ -10,7 +10,7 @@ OUT := build
 CFLAGS386 := -q -3s -mf -ecc -s -zl -zls -ox -w4 -Isrc -I$(WATCOM)/h
 
 .PHONY: all check smoke disk network-fixture clean
-all: $(OUT)/BCM57DBG.386
+all: $(OUT)/BCM57XX.386
 
 $(OUT):
 	mkdir -p $@
@@ -23,8 +23,8 @@ $(OUT)/%.obj: src/%.c src/pci.h src/ndis3.h src/platform.h src/bcm5722_hw.h src/
 
 $(OUT)/bcm5722_hw.obj: src/bcm5722_hw.h
 
-$(OUT)/BCM57DBG.386: $(OUT)/entry.obj $(OUT)/probe.obj $(OUT)/pci.obj $(OUT)/ndis3.obj $(OUT)/adapter.obj $(OUT)/nic.obj $(OUT)/bcm5722_hw.obj $(OUT)/bcm5722_phy.obj $(OUT)/bcm5722_ring.obj $(OUT)/platform.obj tools/check_vxd.py
-	$(LINK386) format windows vxd name $@ option quiet option map=$(OUT)/BCM57DBG.map file $(OUT)/entry.obj file $(OUT)/probe.obj file $(OUT)/pci.obj file $(OUT)/ndis3.obj file $(OUT)/adapter.obj file $(OUT)/nic.obj file $(OUT)/bcm5722_hw.obj file $(OUT)/bcm5722_phy.obj file $(OUT)/bcm5722_ring.obj file $(OUT)/platform.obj segment _TEXT PRELOAD NONDISCARDABLE segment _DATA PRELOAD NONDISCARDABLE export BCM57DBG_DDB.1=_BCM57DBG_DDB
+$(OUT)/BCM57XX.386: $(OUT)/entry.obj $(OUT)/probe.obj $(OUT)/pci.obj $(OUT)/ndis3.obj $(OUT)/adapter.obj $(OUT)/nic.obj $(OUT)/bcm5722_hw.obj $(OUT)/bcm5722_phy.obj $(OUT)/bcm5722_ring.obj $(OUT)/platform.obj tools/check_vxd.py
+	$(LINK386) format windows vxd name $@ option quiet option map=$(OUT)/BCM57XX.map file $(OUT)/entry.obj file $(OUT)/probe.obj file $(OUT)/pci.obj file $(OUT)/ndis3.obj file $(OUT)/adapter.obj file $(OUT)/nic.obj file $(OUT)/bcm5722_hw.obj file $(OUT)/bcm5722_phy.obj file $(OUT)/bcm5722_ring.obj file $(OUT)/platform.obj segment _TEXT PRELOAD NONDISCARDABLE segment _DATA PRELOAD NONDISCARDABLE export BCM57XX_DDB.1=_BCM57XX_DDB
 	$(PYTHON) tools/check_vxd.py --prepare $@
 
 $(OUT)/test_pci: tests/test_pci.c src/pci.c src/pci.h | $(OUT)
@@ -60,7 +60,7 @@ check: all $(OUT)/test_pci $(OUT)/test_ndis3 $(OUT)/test_adapter $(OUT)/test_hw 
 	$(OUT)/test_phy
 	$(OUT)/test_ring
 	$(OUT)/test_start
-	$(PYTHON) tools/check_vxd.py $(OUT)/BCM57DBG.386
+	$(PYTHON) tools/check_vxd.py $(OUT)/BCM57XX.386
 
 $(OUT)/WFWEXIT.EXE: tests/wfw_exit.c | $(OUT)
 	$(WATCOM)/binl64/wcc -q -bt=windows -ms -0 -os -I$(WATCOM)/h -I$(WATCOM)/h/win -fo=$(OUT)/wfw_exit.obj $<
@@ -76,7 +76,7 @@ smoke: all $(OUT)/WFWEXIT.EXE
 # Contents of the WfW setup disk: driver and OEMSETUP.INF side by side.
 disk: all $(OUT)/BCMLOG.EXE
 	mkdir -p $(OUT)/disk
-	cp $(OUT)/BCM57DBG.386 $(OUT)/BCMLOG.EXE inf/OEMSETUP.INF $(OUT)/disk/
+	cp $(OUT)/BCM57XX.386 $(OUT)/BCMLOG.EXE inf/OEMSETUP.INF $(OUT)/disk/
 
 $(OUT)/expand_kwaj: tools/expand_kwaj.c | $(OUT)
 	$(HOST_CC) -Wall -Wextra -Werror $< -lmspack -o $@

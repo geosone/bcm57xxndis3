@@ -33,7 +33,7 @@ Reloadwert gehört Windows; bei einem Überlauf zählen nur die sicher vergangen
 Takte, eine Wartezeit wird dadurch nie kürzer als verlangt.
 
 Der Diagnose-VxD ruft den Reset **nur** mit `ResetTest=1` im Abschnitt
-`[BCM57DBG]` der SYSTEM.INI auf. Dann setzt er bei Bedarf die PCI-Memory-/
+`[BCM57XX]` der SYSTEM.INI auf. Dann setzt er bei Bedarf die PCI-Memory-/
 Busmaster-Bits, führt einen Reset aus und protokolliert Ergebnis,
 Host-Control und MAC-Register. Die MAC-Engines bleiben aus, DMA wird nicht
 programmiert. Voraussetzung bleibt ein Adapter, den kein anderer Treiber

@@ -48,7 +48,7 @@ int PASCAL WinMain(HINSTANCE instance, HINSTANCE previous, LPSTR args, int show)
     if (file == HFILE_ERROR)
         return 1;
     if (!api_entry())
-        _lwrite(file, "BCM57DBG is not loaded\r\n", 24);
+        _lwrite(file, "BCM57XX is not loaded\r\n", 24);
     else
         for (index = 0; index < 6000; index++) {
             value = log_char(index);
