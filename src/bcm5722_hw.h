@@ -75,4 +75,7 @@ void bcm5722_enable_interrupts(const struct bcm_hw_io *, int enable);
 void bcm5722_rx_filter(const struct bcm_hw_io *, uint32_t *rx_mode,
                        int promiscuous);
 
+/* One word of NIC memory through the memory window (diagnostics). */
+uint32_t bcm5722_memory_read(const struct bcm_hw_io *, unsigned address);
+
 #endif

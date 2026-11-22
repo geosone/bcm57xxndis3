@@ -474,27 +474,55 @@ bcm_lin_to_phys endp
 
 profile_section db "BCM57DBG", 0
 
-; Emulator debug console only; no UART or DOS services are touched.
+; Emulator debug console, and a memory log for real hardware: the protected
+; mode API (device ID 3A57h) returns it to a Windows program byte by byte.
+LOG_SIZE equ 6000
 bcm_debug_char proc character:dword
     push edx
     mov eax, character
     mov dx, 0e9h
     out dx, al
+    mov edx, log_length
+    cmp edx, LOG_SIZE
+    jae debug_full
+    mov log_text[edx], al
+    inc log_length
+debug_full:
     pop edx
     ret
 bcm_debug_char endp
+
+; Client AX = index; returns the character in client AX, 0FFFFh at the end.
+; EBP = client registers (Client_EAX at offset 1Ch).
+pm_api_proc proc
+    movzx eax, word ptr [ebp+1ch]
+    mov ecx, 0ffffh
+    cmp eax, log_length
+    jae api_done
+    movzx ecx, byte ptr log_text[eax]
+api_done:
+    mov word ptr [ebp+1ch], cx
+    ret
+pm_api_proc endp
+
+    .data
+log_length dd 0
+log_text db LOG_SIZE dup (0)
+    .code
 
     public BCM57DBG_DDB
     align 4
 BCM57DBG_DDB label byte
     dd 0                        ; next DDB
     dw 030ah                    ; Windows 3.1 DDK interface version
-    dw 0                        ; no assigned device ID, no public API
+    dw 3a57h                    ; device ID for the log API (not assigned by Microsoft)
     db 0, 1                     ; diagnostic version 0.1
     dw 0
     db "BCM57DBG"
     dd 54004000h                ; WfW MAC_Init_Order, after NDIS 54002000h
     dd offset control_proc
-    dd 0, 0, 0, 0, 0, 0, 0    ; V86/PM APIs, reference, service table
+    dd 0                        ; no V86 API
+    dd offset pm_api_proc
+    dd 0, 0, 0, 0, 0            ; API addresses (set by VMM), reference, service table
 
     end

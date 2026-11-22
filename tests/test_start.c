@@ -26,6 +26,9 @@ static void write32(void *context, unsigned offset, uint32_t value)
     (void)context;
     assert(offset < 0x10000 && !(offset & 3));
     regs[offset / 4] = value;
+    /* Memory window data: NIC memory, which is also visible at 8000h. */
+    if (offset == 0x84 && regs[0x7c / 4] < 0x8000)
+        regs[(0x8000 + regs[0x7c / 4]) / 4] = value;
     if (log_count < 512)
         log_offset[log_count++] = offset;
 }

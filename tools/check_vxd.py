@@ -83,15 +83,18 @@ def inspect(path, prepare=False):
     ddb = object_file_offset(ddb_object, ddb_offset, 56)
     if data[ddb + 12:ddb + 20] != b"BCM57DBG":
         raise ValueError("wrong DDB name")
-    if u16(ddb + 4) != 0x030a or u16(ddb + 6) != 0:
+    if u16(ddb + 4) != 0x030a or u16(ddb + 6) != 0x3a57:
         raise ValueError("wrong DDB version or device ID")
     if u32(ddb + 20) != 0x54004000:
         raise ValueError("unexpected initialization order")
     control = u32(ddb + 24)
     if not any(base <= control < base + size for size, base, *_ in objects):
         raise ValueError("control dispatcher is outside the image")
-    if any(data[ddb + 28:ddb + 56]):
-        raise ValueError("unexpected public API or service table")
+    api = u32(ddb + 32)
+    if not any(base <= api < base + size for size, base, *_ in objects):
+        raise ValueError("protected mode API (log) is outside the image")
+    if any(data[ddb + 28:ddb + 32]) or any(data[ddb + 36:ddb + 56]):
+        raise ValueError("unexpected V86 API or service table")
     if b"\xcd\x20\x00\x00\x28\x00" not in data:
         raise ValueError("NdisGetVersion VxD call is missing")
     if prepare:

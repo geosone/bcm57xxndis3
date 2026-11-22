@@ -153,8 +153,8 @@ enum bcm_hw_result bcm5722_reset(const struct bcm_hw_io *io)
 #define WRITE_DMA 0x4c00
 #define FTQ_RESET 0x5c00
 #define LOCAL_CONTROL 0x6808
-#define TX_RCB 0x8100              /* NIC memory window, send ring 1 */
-#define RETURN_RCB 0x8200          /* NIC memory window, return ring 1 */
+#define TX_RCB 0x100               /* NIC memory, send ring 1 */
+#define RETURN_RCB 0x200           /* NIC memory, return ring 1 */
 #define ENGINE_ENABLE 2UL
 #define ENGINE_ENABLE_ATTENTION 6UL
 
@@ -226,6 +226,24 @@ static void ring_control(const struct bcm_hw_io *io, unsigned rcb,
     io->write32(io->context, rcb + 12, nic);
 }
 
+/* The send and return ring control blocks are in NIC memory: through the
+ * memory window registers (as Linux tg3 writes them), not through the
+ * register space at 8000h. */
+static void ring_control_memory(const struct bcm_hw_io *io, unsigned rcb,
+                                uint32_t host, uint32_t length_flags,
+                                uint32_t nic)
+{
+    memory_write(io, rcb, 0);
+    memory_write(io, rcb + 4, host);
+    memory_write(io, rcb + 8, length_flags);
+    memory_write(io, rcb + 12, nic);
+}
+
+uint32_t bcm5722_memory_read(const struct bcm_hw_io *io, unsigned address)
+{
+    return memory_read(io, address);
+}
+
 enum bcm_hw_result bcm5722_start(const struct bcm_hw_io *io,
     const struct bcm_ring_addresses *rings, const uint8_t mac[6],
     uint32_t mac_mode, uint32_t rx_mode, uint32_t tx_mode)
@@ -260,8 +278,8 @@ enum bcm_hw_result bcm5722_start(const struct bcm_hw_io *io,
     ring_control(io, RX_STD_RCB, rings->std, 0x200UL << 16, 0x6000);
     io->write32(io->context, RX_STD_THRESHOLD, 25);
     io->write32(io->context, 0x304, 0);                    /* send producer */
-    ring_control(io, TX_RCB, rings->tx, 512UL << 16, 0x4000);
-    ring_control(io, RETURN_RCB, rings->ret, 0x200UL << 16, 0);
+    ring_control_memory(io, TX_RCB, rings->tx, 512UL << 16, 0x4000);
+    ring_control_memory(io, RETURN_RCB, rings->ret, 0x200UL << 16, 0);
     io->write32(io->context, 0x284, 0);                    /* return consumer */
     io->write32(io->context, 0x26c, rings->std_posted & 511);
 

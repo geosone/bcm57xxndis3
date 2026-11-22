@@ -143,6 +143,10 @@ static void dma_test(const struct bcm_hw_io *io, struct bcm_mac_modes *modes)
         bcm_platform_dma_free();
         return;
     }
+    /* Not "in the interrupt handler": with 1 in the mailbox the chip does
+     * not update the status block (no during-interrupt coalescing). The
+     * interrupt line itself stays masked in the host control register. */
+    io->write32(io->context, 0x204, 0);
     for (i = 0; i < sizeof(loop_frame); ++i)
         loop_frame[i] = (uint8_t)i;
     for (i = 0; i < 6; ++i)
@@ -155,6 +159,44 @@ static void dma_test(const struct bcm_hw_io *io, struct bcm_mac_modes *modes)
         completed += bcm_tx_complete(&rings);
         bcm_rx_poll(io, &rings, loop_deliver, 0);
         bcm_platform_delay_us(10000);
+    }
+    if (loop_matched != 8) {
+        static const uint16_t registers[] = {
+            0x004, 0x068, 0x070, 0x204, 0x26c, 0x284, 0x304, 0x400, 0x404,
+            0x45c, 0x460, 0x468, 0x46c, 0xc00, 0xc04, 0x1400, 0x1404, 0x1800,
+            0x1804, 0x2c00, 0x2c04, 0x3c00, 0x3c04, 0x3c38, 0x3c3c, 0x3c50,
+            0x3c54, 0x3c80, 0x3cc0, 0x4400, 0x4404, 0x4800, 0x4804, 0x4c00,
+            0x4c04, 0x6800, 0x6804, 0x6808, 0x2450, 0x2454, 0x2458, 0x245c
+        };
+        const volatile uint32_t *block = (const volatile uint32_t *)rings.status;
+        bcm_log_text("BCM57DBG: DMA test: registers");
+        for (i = 0; i < sizeof(registers) / sizeof(registers[0]); ++i) {
+            bcm_log_text(i % 4 ? " " : "\r\n  ");
+            bcm_log_hex(registers[i]);
+            bcm_log_text("=");
+            bcm_log_hex(io->read32(io->context, registers[i]));
+        }
+        bcm_log_text("\r\nBCM57DBG: DMA test: send RCB");
+        for (i = 0; i < 4; ++i) {
+            bcm_log_text(" ");
+            bcm_log_hex(bcm5722_memory_read(io, 0x100 + 4 * i));
+        }
+        bcm_log_text(" return RCB");
+        for (i = 0; i < 4; ++i) {
+            bcm_log_text(" ");
+            bcm_log_hex(bcm5722_memory_read(io, 0x200 + 4 * i));
+        }
+        bcm_log_text("\r\nBCM57DBG: DMA test: status block");
+        for (i = 0; i < 5; ++i) {
+            bcm_log_text(" ");
+            bcm_log_hex(block[i]);
+        }
+        bcm_log_text(" tx[0]");
+        for (i = 0; i < 4; ++i) {
+            bcm_log_text(" ");
+            bcm_log_hex(((const volatile uint32_t *)rings.tx)[i]);
+        }
+        bcm_log_text("\r\n");
     }
     stuck = bcm5722_stop(io);
     bcm_log_text("BCM57DBG: DMA test: sent=");
